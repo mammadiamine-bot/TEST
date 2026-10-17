@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "python3 ~/.claude/hooks/orchestrator.py SessionStart", "timeout": 10}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 ~/.claude/hooks/orchestrator.py UserPromptSubmit", "timeout": 5}]}],
+    "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|Bash", "hooks": [{"type": "command", "command": "python3 ~/.claude/hooks/orchestrator.py PostToolUse", "timeout": 20}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "python3 ~/.claude/hooks/orchestrator.py Stop", "timeout": 5}]}]
+  }
+}
