@@ -134,12 +134,62 @@ function LiveLog({ w }: { w: Worker }) {
 }
 
 function Terminal({ w }: { w: Worker }) {
-  const { err, go } = useAsync(); const [clients, setClients] = useState<any[]>([]); const [cid, setCid] = useState(""); const [cmd, setCmd] = useState("git status"); const [out, setOut] = useState("");
-  useEffect(() => { api<any[]>(W(w.id, "/clients")).then(c => { setClients(c); setCid(c[0]?.id ?? ""); }).catch(() => {}); }, [w.id]);
-  const run = () => go(async () => { const { job } = await api(W(w.id, `/clients/${cid}/exec`), "POST", { argv: cmd.trim().split(/\s+/) }); let since = 0, text = "";
-    for (let i = 0; i < 600; i++) { const j = await api(W(w.id, `/clients/${cid}/jobs/${job}?since=${since}`)); text += j.output; since = j.next; setOut(text); if (j.done) { setOut(text + `\n[exit ${j.exit}]`); break; } await new Promise(r => setTimeout(r, 500)); } });
-  return <><Err m={err} /><div className="card mt"><div className="tag">Runs inside ONE client's workspace on the worker (program + arguments, no shell, secrets scrubbed). Everything is audited.</div>
-    <div className="row mt"><select style={{ width: 200 }} value={cid} onChange={e => setCid(e.target.value)}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input dir="ltr" style={{ flex: 1 }} value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={e => e.key === "Enter" && run()} /><button className="btn" disabled={!cid} onClick={run}>Run</button></div><pre dir="ltr">{out}</pre></div></>;
+  type Entry = { name: string; dir: boolean; size: number; mtime: number; link: boolean };
+  type Run = { id: string; command: string; started: number; status: string; output: string; exit: number | null };
+  const [clients, setClients] = useState<any[]>([]); const [cid, setCid] = useState(""); const [cmd, setCmd] = useState("");
+  const [runs, setRuns] = useState<Run[]>([]); const [files, setFiles] = useState<Entry[]>([]); const [err, setErr] = useState(""); const [fileErr, setFileErr] = useState("");
+  const [busy, setBusy] = useState(false); const [active, setActive] = useState<{ job: string; client: string; runId: string } | null>(null);
+  const running = useRef(false); const [shell, setShell] = useState<"cmd" | "powershell">("cmd");
+  const refreshFiles = useCallback(async (clientId: string) => {
+    const r = await api<{ entries: Entry[] }>(W(w.id, `/clients/${clientId}/fs/list`));
+    setFiles(r.entries); setFileErr("");
+  }, [w.id]);
+  useEffect(() => { api<any[]>(W(w.id, "/clients")).then(c => { setClients(c); setCid(c[0]?.id ?? ""); }).catch((e: any) => setErr(e.message)); }, [w.id]);
+  useEffect(() => { setFiles([]); setFileErr(""); if (cid) refreshFiles(cid).catch((e: any) => setFileErr(e.message)); }, [cid, refreshFiles]);
+  const runCommand = useCallback(async (line = cmd) => {
+    const command = line.trim(); const clientId = cid;
+    if (!command || !clientId || running.current) return;
+    running.current = true; setBusy(true); setErr("");
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setRuns(old => [...old, { id: runId, command, started: Date.now(), status: "Starting", output: "", exit: null }]);
+    if (!line) setCmd("");
+    const update = (patch: Partial<Run>) => setRuns(old => old.map(x => x.id === runId ? { ...x, ...patch } : x));
+    try {
+      const { job } = await api<{ job: string }>(W(w.id, `/clients/${clientId}/exec`), "POST", { argv: shell === "cmd" ? ["cmd.exe", "/d", "/c", command] : ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command], timeout: 3600 });
+      setActive({ job, client: clientId, runId }); update({ status: "Running" });
+      let since = 0, output = "", done = false;
+      for (let i = 0; i < 7200; i++) {
+        const j = await api<any>(W(w.id, `/clients/${clientId}/jobs/${job}?since=${since}`));
+        output += j.output ?? ""; since = j.next;
+        update({ output, status: j.done ? (j.cancelled ? "Cancelled" : j.timed_out ? "Timed out" : "Completed") : "Running", exit: j.exit });
+        if (j.done) { done = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      if (!done) update({ status: "Polling limit reached" });
+      try { await refreshFiles(clientId); } catch (e: any) { setFileErr(e.message); }
+    } catch (e: any) { update({ status: "Failed", output: e.message }); setErr(e.message); }
+    finally { setActive(null); running.current = false; setBusy(false); }
+  }, [cid, cmd, shell, refreshFiles, w.id]);
+  const cancel = async () => {
+    if (!active) return;
+    setRuns(old => old.map(x => x.id === active.runId ? { ...x, status: "Cancelling" } : x));
+    try { await api(W(w.id, `/clients/${active.client}/jobs/${active.job}/cancel`), "POST"); }
+    catch (e: any) { setErr(e.message); }
+  };
+  return <><Err m={err} /><div className="card mt">
+    <div className="tag">Each run is one command (CMD or PowerShell) in a fresh process. This is not a persistent shell: interactive prompts and a `cd` that carries over to the next command are not supported. Commands use the selected client's workspace as their working directory; each run uses the existing Worker terminal permission, authenticated connection and audit log.</div>
+    <div className="row mt"><label>Worker</label><span dir="ltr">{w.resources?.host ?? w.name} · {w.online ? "online" : "offline"}</span><label>Client workspace</label>
+      <select style={{ width: 220 }} value={cid} onChange={e => setCid(e.target.value)} disabled={busy}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+    <div className="row mt"><select aria-label="Shell" style={{ width: 130 }} value={shell} onChange={e => setShell(e.target.value as "cmd" | "powershell")} disabled={busy}><option value="cmd">CMD</option><option value="powershell">PowerShell</option></select>
+      <input aria-label="Windows command" dir="ltr" style={{ flex: 1 }} value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void runCommand(); } }} placeholder={shell === "cmd" ? "Enter a CMD command" : "Enter a PowerShell command"} disabled={busy} />
+      <button className="btn" disabled={!cid || !cmd.trim() || busy || !w.online} onClick={() => void runCommand()}>Run</button>
+      {active && <button className="btn danger" onClick={() => void cancel()}>Cancel</button>}</div>
+    <h3 className="mt">Command history</h3><div style={{ maxHeight: 360, overflow: "auto" }}>{runs.length ? runs.slice().reverse().map(x => <div key={x.id} className="card mt">
+      <div className="row"><code dir="ltr">{x.command}</code><span className="pill">{x.status}{x.exit !== null ? ` · exit ${x.exit}` : ""}</span><time>{new Date(x.started).toLocaleTimeString()}</time></div>
+      <pre dir="ltr" style={{ whiteSpace: "pre-wrap" }}>{x.output || (x.status === "Running" ? "Waiting for output…" : "[no output]")}</pre></div>) : <div className="tag">No commands run in this view yet.</div>}</div>
+  </div><div className="card mt"><div className="row"><h3>Workspace files</h3><button className="btn ghost" disabled={!cid} onClick={() => refreshFiles(cid).catch((e: any) => setFileErr(e.message))}>Refresh</button></div>
+    <Err m={fileErr} /><div className="tag">This list is read through the selected client's existing workspace-confined file API.</div>
+    {files.length ? <div style={{ maxHeight: 220, overflow: "auto" }}>{files.map(f => <div key={f.name} className="row"><span>{f.dir ? "DIR" : "FILE"}{f.link ? " · LINK" : ""}</span><code dir="ltr">{f.name}</code><span className="tag">{f.dir ? "" : `${f.size} bytes`} · {new Date(f.mtime * 1000).toLocaleString()}</span></div>)}</div> : <div className="tag">Workspace is empty, or has not been loaded yet.</div>}</div></>;
 }
 
 function Desktop({ w, reload }: { w: Worker; reload: () => void }) {
