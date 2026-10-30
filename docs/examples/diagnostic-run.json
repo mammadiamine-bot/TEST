@@ -1,0 +1,434 @@
+{
+  "id": "run_7d6f49f040ed",
+  "device_id": "dev_af2b88f3bf89",
+  "created_at": 1793340171.4012306,
+  "modules": [
+    "cpu_ram",
+    "performance",
+    "startup",
+    "disk_health",
+    "windows_update",
+    "drivers",
+    "network",
+    "dns_dhcp",
+    "printers",
+    "event_log",
+    "integrity",
+    "software",
+    "storage"
+  ],
+  "data": {
+    "cpu_ram": {
+      "cpu_percent": 53,
+      "ram_total_gb": 16.0,
+      "ram_used_gb": 15.1,
+      "ram_percent": 94
+    },
+    "performance": {
+      "uptime_hours": 900,
+      "pending_reboot": true,
+      "top_processes": [
+        {
+          "name": "chrome",
+          "ws_mb": 2100
+        },
+        {
+          "name": "Teams",
+          "ws_mb": 900
+        }
+      ]
+    },
+    "startup": {
+      "items": [
+        {
+          "name": "App1",
+          "command": "C:\\Apps\\app1.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App2",
+          "command": "C:\\Apps\\app2.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App3",
+          "command": "C:\\Apps\\app3.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App4",
+          "command": "C:\\Apps\\app4.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App5",
+          "command": "C:\\Apps\\app5.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App6",
+          "command": "C:\\Apps\\app6.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App7",
+          "command": "C:\\Apps\\app7.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App8",
+          "command": "C:\\Apps\\app8.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App9",
+          "command": "C:\\Apps\\app9.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App10",
+          "command": "C:\\Apps\\app10.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App11",
+          "command": "C:\\Apps\\app11.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App12",
+          "command": "C:\\Apps\\app12.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App13",
+          "command": "C:\\Apps\\app13.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App14",
+          "command": "C:\\Apps\\app14.exe",
+          "location": "HKU\\Run"
+        },
+        {
+          "name": "App15",
+          "command": "C:\\Apps\\app15.exe",
+          "location": "HKU\\Run"
+        }
+      ]
+    },
+    "disk_health": {
+      "disks": [
+        {
+          "model": "Samsung SSD 860",
+          "health": "Healthy",
+          "operational": "OK",
+          "media": "SSD"
+        }
+      ],
+      "smart_predict_failure": false
+    },
+    "windows_update": {
+      "services": {
+        "wuauserv": "Stopped",
+        "bits": "Running"
+      },
+      "last_update_days": 95,
+      "failures": [
+        {
+          "message": "0x80070422: The service cannot be started",
+          "date": "2026-10-25"
+        }
+      ]
+    },
+    "drivers": {
+      "problem_devices": [
+        {
+          "name": "Unknown device",
+          "class": "Other",
+          "error_code": 28
+        }
+      ]
+    },
+    "network": {
+      "adapters": [
+        {
+          "name": "Ethernet",
+          "ip": "192.168.1.20",
+          "gateway": "192.168.1.1"
+        }
+      ],
+      "gateway_reachable": true,
+      "internet_reachable": true,
+      "dns_resolves": false
+    },
+    "dns_dhcp": {
+      "adapters": [
+        {
+          "name": "Ethernet",
+          "dhcp": true,
+          "ip": "192.168.1.20",
+          "apipa": false,
+          "dns": [
+            "192.168.1.1"
+          ]
+        }
+      ],
+      "dns_resolves": false
+    },
+    "printers": {
+      "spooler": "Stopped",
+      "printers": [
+        {
+          "name": "Office HP",
+          "status": "Error",
+          "jobs": 4
+        }
+      ]
+    },
+    "event_log": {
+      "critical": 1,
+      "errors": 120,
+      "top_sources": [
+        {
+          "source": "Disk",
+          "count": 20,
+          "sample": "The device has a bad block"
+        },
+        {
+          "source": "DCOM",
+          "count": 80,
+          "sample": "DCOM got error"
+        }
+      ]
+    },
+    "integrity": {
+      "dism_checkhealth": "repairable",
+      "defender_realtime": false,
+      "signature_age_days": 12
+    },
+    "software": {
+      "apps": [
+        {
+          "name": "Google Chrome",
+          "version": "130",
+          "publisher": "Google"
+        },
+        {
+          "name": "Shady Toolbar",
+          "version": "1.0",
+          "publisher": "Unknown"
+        }
+      ]
+    },
+    "storage": {
+      "volumes": [
+        {
+          "drive": "C",
+          "size_gb": 237.0,
+          "free_gb": 9.0
+        }
+      ],
+      "temp_mb": 6400
+    }
+  },
+  "errors": {},
+  "findings": [
+    {
+      "id": "event_log.critical",
+      "module": "event_log",
+      "severity": "critical",
+      "title": "1 critical events in the last 24 h",
+      "evidence": "Disk \u00d720; DCOM \u00d780",
+      "suggested": []
+    },
+    {
+      "id": "cpu_ram.ram_high",
+      "module": "cpu_ram",
+      "severity": "high",
+      "title": "Memory almost exhausted",
+      "evidence": "RAM 94% used (15.1/16.0 GB)",
+      "suggested": []
+    },
+    {
+      "id": "windows_update.failures",
+      "module": "windows_update",
+      "severity": "high",
+      "title": "1 recent Windows Update failures",
+      "evidence": "0x80070422: The service cannot be started",
+      "suggested": [
+        {
+          "tool_id": "restart_update_services",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "network.dns_fail",
+      "module": "network",
+      "severity": "high",
+      "title": "Internet works but DNS resolution fails",
+      "evidence": "Resolve-DnsName example.com failed",
+      "suggested": [
+        {
+          "tool_id": "flush_dns",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "printers.spooler_down",
+      "module": "printers",
+      "severity": "high",
+      "title": "Print Spooler is not running",
+      "evidence": "Status: Stopped",
+      "suggested": [
+        {
+          "tool_id": "restart_spooler",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "integrity.dism",
+      "module": "integrity",
+      "severity": "high",
+      "title": "Component store is corrupted but repairable",
+      "evidence": "DISM /CheckHealth: repairable",
+      "suggested": [
+        {
+          "tool_id": "run_dism_restorehealth",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "integrity.defender_off",
+      "module": "integrity",
+      "severity": "high",
+      "title": "Microsoft Defender real-time protection is off",
+      "evidence": "Security setting; changing it needs explicit approval.",
+      "suggested": [
+        {
+          "tool_id": "enable_defender_realtime",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "storage.low_space",
+      "module": "storage",
+      "severity": "high",
+      "title": "Drive C: only 4% free",
+      "evidence": "9.0 GB free of 237.0 GB; temp folder 6400 MB",
+      "suggested": [
+        {
+          "tool_id": "clear_temp_files",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "startup.too_many",
+      "module": "startup",
+      "severity": "medium",
+      "title": "15 startup applications slow down boot",
+      "evidence": "App1; App2; App3; App4; App5; App6; App7; App8 \u2026",
+      "suggested": [
+        {
+          "tool_id": "disable_startup_item",
+          "params": {
+            "name": "App11"
+          }
+        },
+        {
+          "tool_id": "disable_startup_item",
+          "params": {
+            "name": "App12"
+          }
+        },
+        {
+          "tool_id": "disable_startup_item",
+          "params": {
+            "name": "App13"
+          }
+        }
+      ]
+    },
+    {
+      "id": "windows_update.stale",
+      "module": "windows_update",
+      "severity": "medium",
+      "title": "No updates installed for over 60 days",
+      "evidence": "95 days",
+      "suggested": []
+    },
+    {
+      "id": "drivers.problem_devices",
+      "module": "drivers",
+      "severity": "medium",
+      "title": "1 device(s) with driver problems",
+      "evidence": "Unknown device (code 28)",
+      "suggested": []
+    },
+    {
+      "id": "dns_dhcp.dns",
+      "module": "dns_dhcp",
+      "severity": "medium",
+      "title": "DNS resolution failing",
+      "evidence": "Try flushing the cache.",
+      "suggested": [
+        {
+          "tool_id": "flush_dns",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "printers.stuck_jobs",
+      "module": "printers",
+      "severity": "medium",
+      "title": "Stuck print jobs on 1 printer(s)",
+      "evidence": "Office HP: 4 jobs, Error",
+      "suggested": [
+        {
+          "tool_id": "clear_print_queue",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "integrity.sigs_old",
+      "module": "integrity",
+      "severity": "medium",
+      "title": "Antivirus signatures are out of date",
+      "evidence": "12 days old",
+      "suggested": []
+    },
+    {
+      "id": "performance.reboot_pending",
+      "module": "performance",
+      "severity": "low",
+      "title": "A restart is pending",
+      "evidence": "Component servicing reports RebootPending",
+      "suggested": []
+    },
+    {
+      "id": "performance.long_uptime",
+      "module": "performance",
+      "severity": "low",
+      "title": "Machine has not restarted for over 30 days",
+      "evidence": "Uptime 900 h",
+      "suggested": []
+    },
+    {
+      "id": "software.inventory",
+      "module": "software",
+      "severity": "info",
+      "title": "2 programs installed",
+      "evidence": "Review the inventory for unwanted software.",
+      "suggested": []
+    }
+  ],
+  "source": "scripted"
+}
