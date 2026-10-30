@@ -16,6 +16,8 @@ class Settings:
     max_session_minutes: int = 240
     pairing_ttl_seconds: int = 600
     cloud_probe_host: str = os.environ.get("CIT_CLOUD_PROBE_HOST", "api.anthropic.com")
+    ssh_bin: str = os.environ.get("CIT_SSH_BIN", "ssh")
+    local_roots: list = field(default_factory=lambda: [r for r in os.environ.get("CIT_LOCAL_ROOTS", "").split(os.pathsep) if r])
     claude_enabled: bool = os.environ.get("CIT_CLAUDE_ENABLED", "0") == "1"
 
     @property

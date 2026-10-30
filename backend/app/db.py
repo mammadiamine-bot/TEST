@@ -30,6 +30,12 @@ CREATE TABLE IF NOT EXISTS offline_queue(
   id TEXT PRIMARY KEY, created_at REAL NOT NULL, payload TEXT NOT NULL, reviewed INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS credentials(
   device_id TEXT PRIMARY KEY, blob BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS projects(
+  id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, root TEXT NOT NULL, stack TEXT NOT NULL,
+  build_cmd TEXT, test_cmd TEXT, deploy_cmd TEXT, git_url TEXT, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS tasks(
+  id TEXT PRIMARY KEY, device_id TEXT NOT NULL, project_id TEXT, kind TEXT NOT NULL, status TEXT NOT NULL,
+  created_at REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL,
   device_id TEXT, detail TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
