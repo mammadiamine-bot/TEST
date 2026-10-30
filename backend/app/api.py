@@ -269,5 +269,9 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     from .ops import Ops
     ops = Ops(core.db, workers.call)
     app.state.ops = ops
-    app.include_router(build_ops_router(core, ops, lambda org, feature: None))
+    from .api7 import build_router as build_billing_router
+    from .billing import Billing
+    core.billing = Billing(core.db, settings.data_dir)
+    app.include_router(build_ops_router(core, ops, core.billing.entitle))  # fails closed: no plan/feature, no job
+    app.include_router(build_billing_router(core, core.billing))
     return app

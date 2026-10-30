@@ -314,14 +314,25 @@ class Ops:
             if not self.db.one("SELECT 1 AS x FROM workers WHERE id=? AND org_id=?", (wid, org)):
                 raise CoreError("a target machine does not belong to this client", 422)
         sid, now = new_id("sch"), time.time()
-        self.db.execute("INSERT INTO schedules(id,org_id,title,shell,body,risk,targets,every_minutes,next_run,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                        (sid, org, title[:120], shell, body, risk, json.dumps(targets), every_minutes, now + every_minutes * 60, actor, now))
-        self.db.audit(actor, "schedule.created", None, org=org, schedule=sid, risk=risk, every_minutes=every_minutes)
-        return {"id": sid, "risk": risk, "next_run": now + every_minutes * 60}
+        enabled = 1 if risk == "read" else 0  # read-only diagnostics run unattended; anything that changes a machine waits for a second person
+        self.db.execute("INSERT INTO schedules(id,org_id,title,shell,body,risk,targets,every_minutes,enabled,next_run,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (sid, org, title[:120], shell, body, risk, json.dumps(targets), every_minutes, enabled, now + every_minutes * 60, actor, now))
+        self.db.audit(actor, "schedule.created", None, org=org, schedule=sid, risk=risk, every_minutes=every_minutes, enabled=bool(enabled))
+        return {"id": sid, "risk": risk, "enabled": bool(enabled), "next_run": now + every_minutes * 60}
+
+    def approve_schedule(self, org: str, sid: str, approver: str, is_owner: bool) -> dict:
+        s = self.db.one("SELECT * FROM schedules WHERE id=? AND org_id=?", (sid, org))
+        if not s:
+            raise CoreError("unknown schedule", 404)
+        if s["created_by"] == approver and not is_owner:
+            raise CoreError("a second person must approve (four-eyes rule)", 403)
+        self.db.execute("UPDATE schedules SET approved_by=?, enabled=1 WHERE id=?", (approver, sid))
+        self.db.audit(approver, "schedule.approved", None, org=org, schedule=sid, risk=s["risk"])
+        return {"id": sid, "enabled": True, "approved_by": approver}
 
     def tick(self, now: float | None = None) -> int:
         now, n = now or time.time(), 0
-        for s in self.db.all("SELECT * FROM schedules WHERE enabled=1 AND next_run<=?", (now,)):
+        for s in self.db.all("SELECT * FROM schedules WHERE enabled=1 AND next_run<=? AND (risk='read' OR approved_by IS NOT NULL)", (now,)):
             self.db.execute("UPDATE schedules SET last_run=?, next_run=? WHERE id=?", (now, now + s["every_minutes"] * 60, s["id"]))
             live = [w for w in json.loads(s["targets"]) if self.db.one("SELECT 1 AS x FROM workers WHERE id=? AND org_id=?", (w, s["org_id"]))]
             org = self.db.one("SELECT status FROM orgs WHERE id=?", (s["org_id"],))

@@ -18,17 +18,17 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request
 
 ROLES = ("administrator", "technician", "viewer", "customer")  # "owner" exists only as the built-in token; it cannot be minted through the API (no privilege escalation)
-READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools", "/me", "/ops/templates"}  # not tenant data
+READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools", "/me", "/ops/templates", "/plans"}  # not tenant data
 # resource kind -> table whose device_id/org_id gives the owning organization
 DEVICE_CHILD = {"projects": "projects", "tasks": "tasks", "plans": "plans", "runs": "runs", "sessions": "sessions"}
 RESOURCE = re.compile(r"^/(devices|workers|projects|tasks|plans|runs|sessions)/([^/]+)")
 ORG = re.compile(r"^/orgs/([^/]+)")
 OWNER_ONLY_ANY = re.compile(r"^/principals")  # listing/creating who has access: owner, or an administrator inside their own organizations (handlers narrow it further)
-OWNER_ONLY_WRITE = re.compile(r"^(/orgs|/orgs/[^/]+/subscription)$")  # creating clients and billing changes
+OWNER_ONLY_WRITE = re.compile(r"^(/orgs|/orgs/[^/]+/(subscription(/license)?|invoices))$")  # creating clients and billing changes
 OWNER_ONLY_ALL = re.compile(r"^/orgs/[^/]+/(offboard|purge)$")
 ADMIN_WRITE = re.compile(r"^(/orgs/[^/]+/(sites|invitations|groups|alert-rules|notify-policies|settings|schedules|jobs/[^/]+/(approve|reject))(/.*)?|/(devices|workers)/[^/]+/(assign|tags))$")
 ADMIN_READ = re.compile(r"^/orgs/[^/]+/(audit|invitations|notifications)$")
-CUSTOMER_GET = re.compile(r"^/orgs/[^/]+(/fleet|/alerts|/tickets(/[^/]+)?|/reports/[^/]+|/subscription)?$")
+CUSTOMER_GET = re.compile(r"^/orgs/[^/]+(/fleet|/alerts|/tickets(/[^/]+)?|/reports/[^/]+|/subscription|/invoices|/invoice-data)?$")
 CUSTOMER_POST = re.compile(r"^/orgs/[^/]+/tickets$")
 FAIL_LIMIT, FAIL_WINDOW = 30, 60.0  # failed authentications per client address per minute
 

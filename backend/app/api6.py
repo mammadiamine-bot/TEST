@@ -153,6 +153,10 @@ def build_router(core, ops: Ops, entitle: Callable[[str, str], None]) -> APIRout
         need_org(oid)
         return [{**s, "targets": json.loads(s["targets"])} for s in db.all("SELECT * FROM schedules WHERE org_id=?", (oid,))]
 
+    @r.post("/orgs/{oid}/schedules/{sid}/approve")
+    def approve_schedule(oid: str, sid: str, request: Request):
+        return ops.approve_schedule(oid, sid, actor(request), request.state.principal.is_owner)
+
     @r.delete("/orgs/{oid}/schedules/{sid}")
     def del_schedule(oid: str, sid: str, request: Request):
         db.execute("DELETE FROM schedules WHERE id=? AND org_id=?", (sid, oid))

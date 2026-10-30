@@ -175,10 +175,19 @@ def test_schedules_run_pre_approved_work_and_are_confined(w):
     assert adm.post(f"/orgs/{w.a}/schedules", json={"title": "x", "targets": [w.wk["a"]], "every_minutes": 1, "template": "services.list"}).status_code == 422
     assert adm.post(f"/orgs/{w.a}/schedules", json={"title": "x", "targets": [w.wk["b"]], "every_minutes": 60, "template": "services.list"}).status_code == 422
     s = adm.post(f"/orgs/{w.a}/schedules", json={"title": "Nightly inventory", "targets": [w.wk["a"]], "every_minutes": 60, "template": "inventory.system"}).json()
-    assert w.ops.tick(time.time()) == 0
+    assert s["enabled"] is True and w.ops.tick(time.time()) == 0
     assert w.ops.tick(time.time() + 3700) == 1
     j = w.owner.get(f"/orgs/{w.a}/jobs").json()[0]
     assert j["created_by"] == "schedule:" + s["id"] and done(w, w.a, j["id"])["status"] == "completed"
+    # a schedule that changes machines is NOT live until a different person approves it (four-eyes), even if the creator is an administrator
+    m = adm.post(f"/orgs/{w.a}/schedules", json={"title": "restart spooler", "targets": [w.wk["a"]], "every_minutes": 60, "template": "service.restart", "params": {"name": "Spooler"}}).json()
+    w.ops.tick(time.time() + 99999)
+    assert m["enabled"] is False and not [j for j in w.owner.get(f"/orgs/{w.a}/jobs").json() if j["created_by"] == "schedule:" + m["id"]]
+    assert adm.post(f"/orgs/{w.a}/schedules/{m['id']}/approve").status_code == 403           # not by its author
+    _, adm2 = w.mint("administrator", [w.a])
+    assert adm2.post(f"/orgs/{w.a}/schedules/{m['id']}/approve").json()["enabled"] is True
+    w.ops.tick(time.time() + 199999)
+    assert [j for j in w.owner.get(f"/orgs/{w.a}/jobs").json() if j["created_by"] == "schedule:" + m["id"]]
 
 
 def test_inventory_collection_parses_and_stores_latest(w):

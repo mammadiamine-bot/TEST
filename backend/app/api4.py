@@ -80,6 +80,7 @@ def build_router(core, workers) -> APIRouter:
         oid = new_id("org")
         db.execute("INSERT INTO orgs(id,name,created_at) VALUES(?,?,?)", (oid, b.name, time.time()))
         db.audit(actor(request), "org.created", None, org=oid, name=b.name)
+        getattr(core, "billing", None) and core.billing.ensure(oid)  # every client starts on a free trial
         return {"id": oid, "name": b.name}
 
     @r.get("/orgs")
@@ -155,6 +156,9 @@ def build_router(core, workers) -> APIRouter:
             raise HTTPException(422, "that site does not belong to that organization")
         if not db.one(f"SELECT 1 AS x FROM {table} WHERE id=?", (rid,)):
             raise HTTPException(404, "unknown " + table[:-1])
+        cur = db.one(f"SELECT org_id FROM {table} WHERE id=?", (rid,))
+        if cur["org_id"] != b.org_id and getattr(core, "billing", None):
+            core.billing.check_capacity(b.org_id)  # plan device limit (402 when exceeded)
         db.execute(f"UPDATE {table} SET org_id=?, site_id=? WHERE id=?", (b.org_id, b.site_id, rid))
         db.audit(actor(request), f"{table[:-1]}.assigned", rid if table == "devices" else None, **{table[:-1]: rid}, org=b.org_id, site=b.site_id)
         return {"id": rid, "org_id": b.org_id, "site_id": b.site_id}
