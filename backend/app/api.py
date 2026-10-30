@@ -76,7 +76,7 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     app = FastAPI(title="Claude IT Technician API", version="0.1.0", docs_url=None, redoc_url=None)
     app.state.settings, app.state.core = settings, core
 
-    app.add_middleware(CORSMiddleware, allow_origins=["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420"],
+    app.add_middleware(CORSMiddleware, allow_origins=["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420", "http://127.0.0.1:1420"],
                        allow_methods=["*"], allow_headers=["Authorization", "Content-Type"])
 
     @app.exception_handler(CoreError)
