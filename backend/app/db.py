@@ -52,7 +52,33 @@ CREATE TABLE IF NOT EXISTS principals(
 """
 
 # additive, idempotent migrations for databases created before multi-client support (existing rows keep org_id NULL = unassigned)
-MIGRATIONS = [("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
+RMM_SCHEMA = """
+CREATE TABLE IF NOT EXISTS invitations(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, role TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created_by TEXT NOT NULL, created_at REAL NOT NULL, expires_at REAL NOT NULL, used_at REAL, note TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS tags(kind TEXT NOT NULL, rid TEXT NOT NULL, tag TEXT NOT NULL, PRIMARY KEY(kind, rid, tag));
+CREATE TABLE IF NOT EXISTS groups(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE(org_id, name));
+CREATE TABLE IF NOT EXISTS group_members(group_id TEXT NOT NULL, kind TEXT NOT NULL, rid TEXT NOT NULL, PRIMARY KEY(group_id, kind, rid));
+CREATE TABLE IF NOT EXISTS samples(id INTEGER PRIMARY KEY AUTOINCREMENT, worker_id TEXT NOT NULL, ts REAL NOT NULL, online INTEGER NOT NULL, cpu REAL, ram REAL, disk REAL);
+CREATE INDEX IF NOT EXISTS samples_w_ts ON samples(worker_id, ts);
+CREATE TABLE IF NOT EXISTS alert_rules(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, metric TEXT NOT NULL, op TEXT NOT NULL, threshold REAL NOT NULL, consecutive INTEGER NOT NULL DEFAULT 3, severity TEXT NOT NULL DEFAULT 'warning', enabled INTEGER NOT NULL DEFAULT 1, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS alerts(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT NOT NULL, rule_id TEXT, kind TEXT NOT NULL, severity TEXT NOT NULL, message TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'open', first_seen REAL NOT NULL, last_seen REAL NOT NULL, count INTEGER NOT NULL DEFAULT 1, acked_by TEXT, acked_at REAL, resolved_at REAL, dedup TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS alerts_dedup ON alerts(dedup, state);
+CREATE TABLE IF NOT EXISTS notify_policies(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, channel TEXT NOT NULL, target TEXT NOT NULL, min_severity TEXT NOT NULL DEFAULT 'warning', created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, alert_id TEXT, channel TEXT NOT NULL, target TEXT NOT NULL, status TEXT NOT NULL, detail TEXT, ts REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS scripts(id TEXT PRIMARY KEY, org_id TEXT, name TEXT NOT NULL, shell TEXT NOT NULL, risk TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS script_versions(script_id TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, sha256 TEXT NOT NULL, author TEXT NOT NULL, created_at REAL NOT NULL, PRIMARY KEY(script_id, version));
+CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, shell TEXT NOT NULL, body TEXT NOT NULL, risk TEXT NOT NULL, script_id TEXT, script_version INTEGER, status TEXT NOT NULL, approval TEXT NOT NULL DEFAULT 'not_required', approved_by TEXT, created_by TEXT NOT NULL, created_at REAL NOT NULL, retries INTEGER NOT NULL DEFAULT 0, timeout INTEGER NOT NULL DEFAULT 300, schedule_id TEXT);
+CREATE TABLE IF NOT EXISTS job_runs(id TEXT PRIMARY KEY, job_id TEXT NOT NULL, worker_id TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, exit_code INTEGER, output TEXT DEFAULT '', started_at REAL, finished_at REAL, error TEXT);
+CREATE INDEX IF NOT EXISTS job_runs_w ON job_runs(worker_id, started_at);
+CREATE TABLE IF NOT EXISTS schedules(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, shell TEXT NOT NULL, body TEXT NOT NULL, risk TEXT NOT NULL, targets TEXT NOT NULL, every_minutes INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, next_run REAL NOT NULL, last_run REAL, created_by TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS subscriptions(org_id TEXT PRIMARY KEY, plan TEXT NOT NULL, status TEXT NOT NULL, trial_ends REAL, period_start REAL NOT NULL, period_end REAL NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS subscription_history(id INTEGER PRIMARY KEY AUTOINCREMENT, org_id TEXT NOT NULL, ts REAL NOT NULL, actor TEXT NOT NULL, change TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS usage(org_id TEXT NOT NULL, day TEXT NOT NULL, devices INTEGER NOT NULL, jobs INTEGER NOT NULL DEFAULT 0, ai_tokens INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(org_id, day));
+CREATE TABLE IF NOT EXISTS tickets(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, alert_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal', status TEXT NOT NULL DEFAULT 'open', created_by TEXT NOT NULL, created_at REAL NOT NULL, due_at REAL, resolved_at REAL);
+CREATE TABLE IF NOT EXISTS ai_runs(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, actor TEXT NOT NULL, request TEXT NOT NULL, engine TEXT NOT NULL, model TEXT, plan TEXT, answer TEXT, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, status TEXT NOT NULL, ts REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
+"""
+
+MIGRATIONS = [("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 
 def new_id(prefix: str) -> str:
@@ -68,6 +94,7 @@ class Db:
         self.lock = threading.RLock()
         with self.lock:
             self.conn.executescript(SCHEMA)
+            self.conn.executescript(RMM_SCHEMA)
             for table, col, typ in MIGRATIONS:
                 if col not in {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}:
                     self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")

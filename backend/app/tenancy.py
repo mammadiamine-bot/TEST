@@ -17,14 +17,20 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
 
-ROLES = ("technician", "viewer")  # "owner" exists only as the built-in token; it cannot be minted through the API (no privilege escalation)
-READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools"}  # not tenant data
+ROLES = ("administrator", "technician", "viewer", "customer")  # "owner" exists only as the built-in token; it cannot be minted through the API (no privilege escalation)
+READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools", "/me"}  # not tenant data
 # resource kind -> table whose device_id/org_id gives the owning organization
 DEVICE_CHILD = {"projects": "projects", "tasks": "tasks", "plans": "plans", "runs": "runs", "sessions": "sessions"}
 RESOURCE = re.compile(r"^/(devices|workers|projects|tasks|plans|runs|sessions)/([^/]+)")
 ORG = re.compile(r"^/orgs/([^/]+)")
-OWNER_ONLY_ANY = re.compile(r"^/principals")  # even listing who has access is owner-only
-OWNER_ONLY_WRITE = re.compile(r"^(/orgs|/orgs/[^/]+/sites|/(devices|workers)/[^/]+/assign)$")  # structure changes
+OWNER_ONLY_ANY = re.compile(r"^/principals")  # listing/creating who has access: owner, or an administrator inside their own organizations (handlers narrow it further)
+OWNER_ONLY_WRITE = re.compile(r"^(/orgs|/orgs/[^/]+/subscription)$")  # creating clients and billing changes
+OWNER_ONLY_ALL = re.compile(r"^/orgs/[^/]+/(offboard|purge)$")
+ADMIN_WRITE = re.compile(r"^(/orgs/[^/]+/(sites|invitations|groups|alert-rules|notify-policies|settings)(/.*)?|/(devices|workers)/[^/]+/(assign|tags))$")
+ADMIN_READ = re.compile(r"^/orgs/[^/]+/(audit|invitations|notifications)$")
+CUSTOMER_GET = re.compile(r"^/orgs/[^/]+(/fleet|/alerts|/tickets(/[^/]+)?|/reports/[^/]+|/subscription)?$")
+CUSTOMER_POST = re.compile(r"^/orgs/[^/]+/tickets$")
+FAIL_LIMIT, FAIL_WINDOW = 30, 60.0  # failed authentications per client address per minute
 
 
 def token_hash(tok: str) -> str:
@@ -42,17 +48,33 @@ class Principal:
         return self.orgs is None
 
 
+def _fails(request: Request):
+    st = request.app.state
+    if not hasattr(st, "authfail"):
+        st.authfail = {}
+    return st.authfail.setdefault(request.client.host if request.client else "?", [])
+
+
 def authenticate(request: Request) -> Principal:
+    fails = _fails(request)
+    now = time.time()
+    fails[:] = [t for t in fails if now - t < FAIL_WINDOW]
+    if len(fails) >= FAIL_LIMIT:
+        raise HTTPException(429, "too many failed attempts; try again later")
+
+    def bad():
+        fails.append(now)
+        raise HTTPException(401, "invalid or missing API token")
     scheme, _, supplied = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not supplied:
-        raise HTTPException(401, "invalid or missing API token")
+        bad()
     if hmac.compare_digest(supplied.encode(), request.app.state.settings.api_token.encode()):
         return Principal("owner", "owner", None)
     db = request.app.state.core.db
     row = db.one("SELECT * FROM principals WHERE token_hash=? AND revoked=0", (token_hash(supplied),))
     if not row:
-        raise HTTPException(401, "invalid or missing API token")
-    db.execute("UPDATE principals SET last_used=? WHERE id=?", (time.time(), row["id"]))
+        bad()
+    db.execute("UPDATE principals SET last_used=? WHERE id=?", (now, row["id"]))
     return Principal(row["id"], row["role"], frozenset(json.loads(row["org_ids"])))
 
 
@@ -64,6 +86,11 @@ def org_of(db, kind: str, rid: str) -> str | None:
     return r["org_id"] if r else None
 
 
+def org_active(db, oid: str) -> bool:
+    r = db.one("SELECT status FROM orgs WHERE id=?", (oid,))
+    return bool(r) and (r["status"] or "active") == "active"
+
+
 def authorize(request: Request) -> None:
     """FastAPI dependency (wired through security.require_token): authenticate, then enforce role + organization scope."""
     p = authenticate(request)
@@ -71,26 +98,45 @@ def authorize(request: Request) -> None:
     if p.is_owner:
         return
     db, path, method = request.app.state.core.db, request.url.path, request.method
+    write = method not in ("GET", "HEAD")
 
     def deny(why: str):
         db.audit(p.id, "tenancy.denied", None, method=method, path=path, why=why)
         raise HTTPException(403, "not permitted")  # same answer for 'forbidden' and 'does not exist': no probing
 
-    if OWNER_ONLY_ANY.match(path) or (method not in ("GET", "HEAD") and OWNER_ONLY_WRITE.match(path)):
+    def in_scope(oid: str, why: str):
+        if oid not in p.orgs or not org_active(db, oid):
+            deny(why)
+
+    if not write and path in ("/me", "/orgs"):
+        return  # own identity / own (filtered) organization list
+    if OWNER_ONLY_ALL.match(path) or (write and OWNER_ONLY_WRITE.match(path)):
         deny("owner only")
-    if method not in ("GET", "HEAD") and p.role == "viewer":
+    if OWNER_ONLY_ANY.match(path):
+        if p.role != "administrator":
+            deny("administrator or owner only")
+        return  # handlers confine an administrator to their own organizations
+    if p.role in ("viewer", "customer") and write and not (p.role == "customer" and CUSTOMER_POST.match(path)):
         deny("read-only role")
-    if method == "GET" and (path in READ_OPEN or path == "/orgs"):
+    if p.role == "customer":
+        if (CUSTOMER_GET.match(path) and not write) or CUSTOMER_POST.match(path):
+            in_scope(ORG.match(path).group(1), "organization out of scope")
+            return
+        deny("route not available to customers")
+    if write and ADMIN_WRITE.match(path) and p.role != "administrator":
+        deny("administrator only")
+    if not write and ADMIN_READ.match(path) and p.role != "administrator":
+        deny("administrator only")
+    if not write and (path in READ_OPEN or path == "/orgs"):
         return
     m = ORG.match(path)
     if m:
-        if m.group(1) in p.orgs:
-            return
-        deny("organization out of scope")
+        in_scope(m.group(1), "organization out of scope")
+        return
     m = RESOURCE.match(path)
     if m:
         org = org_of(db, m.group(1), m.group(2))
-        if org is not None and org in p.orgs:
+        if org is not None and org in p.orgs and org_active(db, org):
             return
         deny("resource out of scope or unassigned")
     deny("route not available to scoped principals")
