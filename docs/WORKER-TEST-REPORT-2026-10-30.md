@@ -25,6 +25,10 @@ Run with `tools/worker_check.py` through the controller API (the path the dashbo
 | FINDING | controller notices an outage slowly | status stayed `online` for ~70 s after the drop (flipped to `reconnecting` at 16:41:03): health probes use a 15 s timeout with GET retries on a 10 s poll. A first attempt (short drop) was not noticed at all. Not fixed yet. |
 | NOT RUN | Claude Code **task** on the worker | not approved / no separate login checked |
 | NOT RUN | revoke / lock from the Worker | destructive to the connection; run last, with the owner |
-| NOT DONE | automatic start at Windows logon | awaiting owner approval; no scheduled task exists |
+| DEVIATION | automatic start at Windows logon: scheduled task | `schtasks /Create … /SC ONLOGON` → `Access is denied` (needs an elevated admin; UAC not bypassed) |
+| PASS | automatic start at logon via the user's Startup-folder launcher (no admin, no password) | launcher file read back; after **Restart** the Worker was reachable again with no manual action |
+| PASS | reboot survival | Worker boot 2026-10-30 17:05:25 (previous full boot 2026-07-06); port back ~95 s after boot; **same TLS fingerprint**; **old credential accepted** (no re-enrollment); host DESKTOP-1KV25VV, unlocked, `secret_store=os-backed`; controller state `online` |
+| PASS | the launcher (not a manual run) started it | single worker instance, its parent already exited (`start`), command line identical to the launcher; started 4 s before the watcher saw the port (Worker clock is 42 s ahead of the controller's) |
+| FINDING | Worker clock is ~42 s ahead of the controller | time sync not working on the Worker; harmless here, matters for token expiry / audit ordering |
 
-13 + 1 passed, 0 failed. **24/7 operation is not claimed**: nothing has run unattended, nothing survived a Worker reboot or a Wi-Fi drop yet.
+15 passed, 0 failed (+1 deviation, +2 findings). Not run: Claude Code task, revoke/lock. **Verified unattended operation = one Wi-Fi outage and one restart.** Continuous 24/7 over days is not demonstrated; it also depends on the Windows user logging on after every reboot (auto-logon is not configured).
