@@ -26,6 +26,7 @@ const D: Record<string, { en: string; ar: string }> = {
   newTask: { en: "New task", ar: "مهمة جديدة" }, kind: { en: "Task type", ar: "نوع المهمة" }, instruction: { en: "Instruction for Claude", ar: "التعليمات إلى Claude" },
   features: { en: "Feature status", ar: "حالة الميزات" }, mode: { en: "Execution mode", ar: "وضع التنفيذ" },
   modeCentral: { en: "Central Claude (this computer)", ar: "Claude المركزي (هذا الجهاز)" }, modeRemote: { en: "Remote Claude (on the target)", ar: "Claude البعيد (على الجهاز الهدف)" },
+  clients: { en: "Clients & sites", ar: "العملاء والمواقع" },
   workers: { en: "AI Worker Stations", ar: "محطات العمل الذكية" },
   scripted: { en: "Scripted (rule-based, not AI)", ar: "مبرمج (قواعد ثابتة، ليس ذكاءً اصطناعياً)" },
   revoke: { en: "Revoke", ar: "إلغاء" }, download: { en: "Download PDF", ar: "تنزيل PDF" },
