@@ -38,3 +38,17 @@ Only connect devices whose owner authorized you. Never forward ports for SSH/Win
 | Destructive/production change | high risk = per-action confirmation; production = typed project/server name; deletions in a push upgrade it to high | yes |
 | Prompt injection via project files | Bash off by default, approvals before push, backups, verification — **mitigation, not elimination** | partly |
 Not covered: OS-level sandbox for Central Claude, agent code signing (needs a certificate), endpoint-security (EDR) interplay — if security software blocks the agent, do not bypass it.
+
+## M3: Worker Station threat model
+| Threat | Control | Tested |
+|---|---|---|
+| Someone else's laptop controls the worker | enrollment code shown on the worker only, single use, 10 min, cancelled after 5 wrong tries; per-controller revocable credentials; optional expiry | yes |
+| Worker impersonated on the network | persistent self-signed identity; fingerprint pinned by the controller; mismatch refused and never retried | yes |
+| Worker reachable from the Internet | refuses non-private/Tailscale sources; bind it to the Tailscale IP; nothing else listens | yes |
+| Client A reads client B | separate workspace/FsGuard/JobManager per client; env built per task from that client's secrets only; owner's secrets scrubbed | yes |
+| Unattended access outside the agreement | authorization window (set on the machine) locks the worker when it ends; STOP file; emergency stop; `revoke-all` | yes |
+| Re-running a destructive step after a crash | attempt marker persisted before start; `needs_review`; orphan killed; retry needs a new approval | yes (real SIGKILL) |
+| Scanning the client's network | no scanning code; `system-check` only for approved host:port; firewall script blocks the rest of the LAN | partly (script unapplied) |
+| Secrets at rest | DPAPI (Windows); refuses plain storage elsewhere | refusal tested; DPAPI via CI |
+| Cleanup at the end of a job | `wipe --name` overwrites secrets/keys, deletes data; remove scheduled task, Tailscale, RustDesk, firewall rule | yes (data); rest manual |
+Residual risks: same-OS-user isolation (use separate Windows accounts for hostile clients); Claude Code is not network-sandboxed; SSD overwrite is best-effort; auto-resume is off by default.

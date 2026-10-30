@@ -82,7 +82,10 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     from .dev import Dev
     from .tasks import Tasks
     dev = Dev(core); tasks = Tasks(core, dev)
-    app.state.dev, app.state.tasks = dev, tasks
+    from .api3 import build_router as build_workers_router
+    from .workers import Workers
+    workers = Workers(core)
+    app.state.dev, app.state.tasks, app.state.workers = dev, tasks, workers
 
     app.add_middleware(CORSMiddleware, allow_origins=["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420", "http://127.0.0.1:1420"],
                        allow_methods=["*"], allow_headers=["Authorization", "Content-Type"])
@@ -251,4 +254,5 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
 
     app.include_router(r)
     app.include_router(build_router(core, dev, tasks))
+    app.include_router(build_workers_router(workers))
     return app

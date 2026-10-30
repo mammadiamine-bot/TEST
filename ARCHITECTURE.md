@@ -38,3 +38,13 @@ Technician laptop (control center)                                   Client mach
 - **Mode B (Remote)**: project backup → agent starts `claude` in the project dir with the **client's** environment → output streamed to the dashboard → tests on the target. The controller has no code path that sends credentials (agent rejects unknown fields; test asserts it).
 - `Target` protocol (`targets.py`): `LocalTarget`, `AgentClient`, `LinuxSshTarget`. All dev/server/task features use it, so they work identically on every target.
 - Authorization on agent devices: consent happens on the client's screen (code + fingerprint); the controller records it as an active session limited by the agent's own expiry.
+
+## M3: Worker Station
+```
+Laptop (control center) ── pinned TLS over Tailscale/LAN ──▶ cit_worker (service on the Worker PC)
+  Workers manager (enroll, health monitor, proxy allowlist)     ├ Store (SQLite): credentials, clients, projects, tasks, events, checkpoints, audit chain
+                                                                 ├ Scheduler: approved tasks → one per project, survives laptop disconnects
+                                                                 ├ Per client: workspace dir · FsGuard · JobManager · secrets (DPAPI) · CLAUDE_CONFIG_DIR
+                                                                 └ Locks: STOP file · authorization window · emergency stop · revoke-all · wipe
+```
+Recovery rule: on start, `running` → `interrupted`; a destructive task whose attempt marker was persisted → `needs_review`; orphan job processes (pid + start time match) are killed; nothing is re-run unless `auto_resume` and the task is a non-destructive Claude task with a saved session.

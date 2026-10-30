@@ -146,6 +146,13 @@ def build_router(core: Core, dev: Dev, tasks: Tasks) -> APIRouter:
     def conn_test(did: str):
         return C.agent_test(core, did)
 
+    @r.get("/devices/{did}/info")
+    def device_info(did: str):
+        """Live facts from the machine itself (OS, host name, tools, what the owner allowed) + the session state."""
+        d = core.device(did)
+        info = run(lambda: core.target(did).info())
+        return {"device": d, "info": info, "sessions": core.sessions(did)[:3]}
+
     # ---- projects
     @r.get("/stacks")
     def stacks():

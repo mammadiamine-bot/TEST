@@ -10,7 +10,7 @@ tested = automated tests pass · untested = code exists, never run against the r
 | Area | Status | Evidence / caveat |
 |---|---|---|
 | Portable agent `agent/cit_agent.py` (TLS cert pinning, 8-digit single-use code, 5-attempt lockout, per-owner grants: terminal/write/repair/claude, session expiry, `d`+Enter / Ctrl+C disconnect, temp cert files deleted, refuses public source IPs, unknown JSON fields rejected so no credential field can exist) | **tested** | 16 loopback tests + `--selftest` (also run in CI on Linux and on a Windows runner) |
-| Agent as a Windows `.exe` + USB folder (`start-agent.bat`, README) | **untested** | CI job `agent-windows` builds it and runs `--selftest`; check the Actions result. Windows never auto-runs USB programs, so the client starts it |
+| Agent as a Windows `.exe` + USB folder (`start-agent.bat`, README) | `.exe` build + `--selftest` **passed on a Windows CI runner**; `start-agent.bat` and USB use **untested** | loopback only. Windows never auto-runs USB programs, so the client starts it |
 | Targets: one API for agent, this computer, Linux SSH servers; confined filesystem (symlink-safe), argv-only exec, scrubbed env, capped output, cancel/timeout | **tested** | agent + local; SSH via a fake `ssh` that executes the remote string through `sh` (proves quoting) |
 | Existing Windows diagnostics/repairs now also run through the agent | **untested** on Windows | routed + grant-checked in tests with an injected PowerShell runner |
 | Dev workspace: projects, explorer, editor (keeps previous version on every save), git status/diff, build/test, restricted terminal, backup/rollback, environment info | **tested** | agent + local targets |
@@ -23,6 +23,41 @@ tested = automated tests pass · untested = code exists, never run against the r
 | Emergency stop (revoke sessions, disconnect agents, cancel jobs) | **tested** | API, UI button, real agent process stopped in the browser e2e |
 | UI: 14 sections (all M1 pages still reachable as tabs), AR/EN + RTL, task view with approvals/live log/diff | **tested** | `e2e/universal.js`: real browser + real backend + real agent process + test-double Claude; found and fixed a real bug (API rejected the agent's 8-digit code) |
 | Windows installer | **untested** | CI built the NSIS installer green (M1); never installed or run |
+
+
+## M3 — Dedicated AI Worker Station (added on top of M1/M2; nothing removed)
+Main laptop → pinned-TLS connection (Tailscale/LAN) → **Worker PC** (`worker/cit_worker.py`) → per-client workspaces/projects/approved systems.
+| Requirement | Status | Evidence / caveat |
+|---|---|---|
+| Worker registration, enrollment code shown on the worker, credential revocable, optional expiry, several workers | **tested** | enrollment rules, single use, 5-attempt cancel, revoke (credential and `revoke-all`) |
+| Online/offline, CPU/RAM/disk, active tasks, queue counts in the dashboard | **tested** (Linux) | psutil; Windows readings untested |
+| Assign worker to client/project (clients with own workspace, approved systems, authorization days) | **tested** | |
+| Claude Code on the worker, per-client sessions, streaming logs, reconnect-and-replay, cancel, emergency stop | **tested machinery**; real Claude **untested** | fake `claude` double; each client gets its own `CLAUDE_CONFIG_DIR` and its own `ANTHROPIC_API_KEY` secret; the owner's key is scrubbed |
+| Keeps running approved tasks when the laptop is gone | **tested** | |
+| Automatic reconnection after network interruption | **tested** | GETs retried with backoff; POSTs never blindly retried; a different certificate on the same address is refused |
+| Durable queue: pending/running/completed/failed/paused/cancelled/interrupted/needs_review | **tested** | one running task per project; global parallelism configurable |
+| Safe resume; never repeat destructive actions | **tested** | real SIGKILL test: a destructive `command` that was running becomes `needs_review`, is NOT re-run, orphan process is killed; only `retry` with a new approval can run it again; `auto_resume` is opt-in and only for non-destructive Claude tasks with a saved session |
+| Production approval | **tested** | deploy is always production: typed "Client name/project" |
+| Automatic checkpoints + restore | **tested** | tar.gz snapshot before Claude/destructive steps (100 MB cap, refuses to run without one) |
+| Client-site mode: approved systems only, no scanning, visible identity/status, revoke, remove | **tested** | `system-check` refuses anything not on the client's list; STOP file; authorization window locks the worker when it ends; `wipe --name` overwrites secrets then deletes |
+| Network isolation / firewall | **untested** | generates a Windows Firewall script (private ranges minus approved systems/gateway/DNS) — never applied; app-level policy only until you run it |
+| Terminal / files / git / build / test / deploy per client | **tested** | Docker availability is only detected, no Docker-specific actions yet |
+| Tailscale / SSH / RustDesk | Tailscale **untested**; RustDesk launch **untested**; SSH **planned** for the worker | worker API listens only for private/Tailscale sources and is meant to be bound to the 100.x address |
+| Secrets in OS-backed storage | **untested** on Windows | DPAPI via `windows_check.py` in CI; elsewhere the worker REFUSES to store secrets unless started with `--dev-insecure-store` (reported as "NOT OS-backed") |
+| Visible, explicit persistence | **untested** | `service install --user X --i-understand` creates one named scheduled task; `service remove` deletes it; no hidden persistence |
+| Dashboard section "AI Worker Stations" (overview, add wizard, clients/projects, queue, live log, terminal, remote desktop, security) | **tested** | browser e2e `e2e/worker.js` |
+
+Limits to remember: (1) client isolation is enforced by the worker's code (separate folders, env, secrets); a malicious *project* running as the same Windows user could still read other clients' folders — for hostile clients use separate Windows accounts or separate Workers. (2) Claude Code's own network/file access is not sandboxed by this app; the firewall script and a dedicated Windows account are the real controls. (3) The controller's token for a worker is persisted only where DPAPI exists; elsewhere you re-enroll after restarting the app.
+
+## M4 — first real LAN test (main PC + second PC on the same Wi-Fi)
+**Status: NOT PERFORMED.** No computer was connected to the assistant's session (`list_computer_folders` returned nothing) and it runs in a Linux cloud container, so it could not see the USB drive, this PC's network, or the second PC. Nothing was simulated.
+What was built so you can do it and get real evidence:
+- `tools/prepare-usb.ps1` — read-only network/USB listing, copy to `<drive>:\CITAgent` only after you type YES, never formats/deletes/overwrites, SHA-256 verified. **untested on Windows**; a static test forbids destructive commands.
+- Agent banner now prints the PC's own LAN addresses (so no scanning is ever needed to find it). `probe` accepts the port you typed.
+- `tools/lan_check.py` — the real end-to-end verifier (pair, connection test, remote exec, 200 KB file round trip with SHA-256, hello.py coding task, optional remote Claude with live log, real reconnect, disconnect). Proven against a real backend + real agent over **loopback only** (3 tests: all-pass, BLOCKED-not-success when the owner denied permissions, honest FAIL on a wrong fingerprint).
+- Dashboard: *Devices → Details / test* shows the machine's own host/OS/tools/permissions and the staged connection test (backend `GET /devices/{id}/info`).
+- `docs/LAN-TEST-RUNBOOK.md` — numbered steps, who does what, where your approval is required (firewall prompt, installs, Claude sign-in with a separate account).
+**Still unverified until you run it:** every Windows-side behaviour of the above, real Wi-Fi reachability (router client isolation?), Claude Code on the second PC.
 
 ## Known gaps / blocked (honest list)
 - **Real Claude never exercised**: the flag set (`-p --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools …`) is from documentation knowledge; first run on a real login may need adjustments. Central-mode isolation between clients relies on a per-device/per-project working directory + restricted tools, not an OS sandbox.

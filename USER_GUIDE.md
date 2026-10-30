@@ -26,3 +26,9 @@ If the Internet is down the header shows "Offline"; diagnostics and reports stil
 3. *Development Projects* → add the project folder (as it exists on the client) → explore/edit/test, or *AI Workspace* → Development → choose Central or Remote Claude, write the instruction, review the plan, approve, watch the live log, review the diff (Central), check verification, download the report.
 4. Done? Click *Revoke* (or the client types `d`). *EMERGENCY STOP* ends everything at once.
 Remote Claude needs the client to sign in to Claude Code with **their own** account (or API key). Never give them yours.
+
+## M3: Dedicated Worker PC at a client site
+On the Worker (visible console, Windows): `cit-worker.exe authorize --days 14` · `cit-worker.exe run --bind <Tailscale 100.x IP>` (prints the fingerprint) · `cit-worker.exe enroll` (one-time 8-digit code).
+On the laptop: *AI Worker Stations → Add worker* (address + fingerprint, then the code). Then *Clients & projects* (one client per customer: approved systems, projects, the client's own `ANTHROPIC_API_KEY` secret) → *Task queue* (queue → approve → watch *Live log*).
+Close the laptop: approved tasks keep running; reopen and the log is replayed. For the site's staff: create a file named `STOP` in the worker folder, or run `cit-worker.exe lock` / `revoke-all`. When you leave: `service remove`, `wipe --name <worker name>`, remove Tailscale/RustDesk and the firewall rule (`firewall-script` prints the rule to add and the line to remove it).
+Optional isolation: `cit-worker.exe firewall-script --infra <gateway>,<dns>` → review → run as Administrator.

@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 from .db import new_id
 from .service import Core, CoreError
 from .servers import run_sync
-from .targetcore import TargetError, redact_argv
+from .targetcore import SKIP_DIRS, TargetError, redact_argv
 
 STACKS = {  # suggestions only; the technician confirms or edits the commands
     "react": (["npm", "run", "build"], ["npm", "test"]), "nextjs": (["npm", "run", "build"], ["npm", "test"]),
@@ -22,7 +22,6 @@ STACKS = {  # suggestions only; the technician confirms or edits the commands
     "android": (["./gradlew", "assembleDebug"], ["./gradlew", "test"]), "flutter": (["flutter", "build", "apk"], ["flutter", "test"]),
     "docker": (["docker", "build", "."], None), "desktop": (None, None), "legacy": (None, None), "database": (None, None), "other": (None, None),
 }
-SKIP_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", "target", ".venv", "venv", ".next", ".gradle", ".idea", ".cit"}
 MAX_FILES, MAX_BYTES = 3000, 50 * 1024 * 1024
 GIT = {"status": ["git", "status", "--porcelain=v1", "-b"], "diff": ["git", "diff", "--stat"], "log": ["git", "log", "--oneline", "-n", "20"],
        "branch": ["git", "branch", "-a"]}

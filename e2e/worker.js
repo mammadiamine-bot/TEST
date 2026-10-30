@@ -1,0 +1,40 @@
+// End-to-end browser test for AI Worker Stations: real backend + REAL worker process + Vite UI. `claude` is the test double.
+// Run: cd e2e && NODE_PATH=$(npm root -g) node worker.js
+const { chromium } = require('playwright'); const { spawn, spawnSync } = require('child_process'); const path = require('path'); const fs = require('fs'); const os = require('os');
+const R = path.resolve(__dirname, '..'); const W = fs.mkdtempSync(path.join(os.tmpdir(), 'cit-e2e-w-'));
+fs.mkdirSync(`${W}/bin`); fs.mkdirSync(`${W}/ctrl`);
+fs.writeFileSync(`${W}/bin/claude`, `#!/bin/sh\nexec python3 ${R}/backend/tests/fake_claude.py "$@"\n`, { mode: 0o755 });
+const env = { ...process.env, PATH: `${W}/bin:${process.env.PATH}`, CIT_DATA_DIR: `${W}/ctrl`, CIT_API_TOKEN: 'devtoken' };
+const procs = []; const sp = (cmd, args, opts = {}) => { const p = spawn(cmd, args, { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], ...opts }); procs.push(p); return p; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const wk = (...a) => ['python3', [`${R}/worker/cit_worker.py`, '--data-dir', `${W}/worker`, '--dev-insecure-store', ...a]];
+(async () => {
+  const code = /: (\d{8})/.exec(spawnSync(...wk('enroll'), { env, encoding: 'utf8' }).stdout)[1];
+  spawnSync(...wk('authorize', '--days', '14'), { env });
+  const worker = sp(...wk('run', '--port', '8777')); let wout = ''; worker.stdout.on('data', d => wout += d);
+  sp('python3', ['-m', 'app.main'], { cwd: `${R}/backend` }); sp('npx', ['vite', '--host', '127.0.0.1'], { cwd: `${R}/frontend`, env: { ...env, VITE_API_TOKEN: 'devtoken' } });
+  await sleep(6000);
+  const fp = /Fingerprint:\s+([0-9A-F ]+)/.exec(wout)[1].trim();
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1360, height: 900 } }); p.setDefaultTimeout(15000); const errs = [];
+  p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && errs.push(m.text())); p.on('dialog', d => d.accept());
+  await p.goto('http://127.0.0.1:1420'); await p.click('nav >> text="AI Worker Stations"');
+  await p.click('button:text-is("Add worker")');
+  await p.fill('text=Name >> xpath=../input', 'Acme office worker'); await p.fill('input[placeholder^="100.101"]', '127.0.0.1:8777'); await p.fill('text=Fingerprint shown on the worker >> xpath=../input >> nth=0', fp);
+  await p.click('button:text-is("Register")'); await p.fill('text=Enrollment code (8 digits) >> xpath=../input', code); await p.click('button:has-text("Enroll & connect")');
+  await p.waitForSelector('button:has-text("🟢 Acme office worker")', { timeout: 20000 }); await p.screenshot({ path: path.join(W, 'overview.png') });
+  console.log('enrolled and online; resources shown:', await p.locator('text=/CPU \\d+%/').count() > 0);
+  await p.click('button:text-is("Clients & projects")');
+  await p.locator('details input').nth(0).fill('acme'); await p.locator('details input').nth(1).fill('Acme Corp'); await p.click('button:text-is("Create")'); await p.waitForSelector('button:text-is("Acme Corp")');
+  await p.fill('text=Project name >> xpath=../input', 'webapp'); await p.click('button:text-is("Add project")'); await p.waitForSelector('b:text-is("webapp")');
+  await p.click('button:text-is("Task queue")'); await p.selectOption('text=Type >> xpath=../select', 'claude'); await p.fill('textarea', 'hello from the dashboard');
+  await p.click('button:text-is("Queue")'); await p.waitForSelector('text=awaiting_approval');
+  await p.click('tr:has-text("claude") button:text-is("Approve")'); await p.waitForSelector('text=/completed/', { timeout: 20000 });
+  await p.click('button:text-is("Live log")'); await p.waitForSelector('pre:has-text("started")', { timeout: 10000 }); await p.screenshot({ path: path.join(W, 'queue-log.png') });
+  console.log('log shows streamed events:', (await p.locator('pre').innerText()).split('\n').length > 3);
+  await p.click('button:text-is("Security")'); await p.waitForSelector('text=Controller credentials'); 
+  await p.click('nav >> text="AI Worker Stations"'); await p.click('main button:text-is("Overview")'); await p.click('button:has-text("Emergency stop this worker")'); await p.waitForSelector('text=LOCKED', { timeout: 15000 });
+  console.log('dashboard shows the worker as LOCKED after emergency stop (waited for the UI element)');
+  await p.click('nav >> text=العربية'); await p.screenshot({ path: path.join(W, 'rtl.png') });
+  console.log('console errors:', JSON.stringify(errs.filter(e => !/Failed to load resource|423/.test(e)))); console.log('screenshots in', W);
+  await b.close();
+})().catch(async e => { console.error('FAIL', e.message.split('\n').slice(0, 3).join(' | ')); process.exitCode = 1; }).finally(() => procs.forEach(pr => { try { process.kill(-pr.pid); } catch {} }));

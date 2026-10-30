@@ -54,7 +54,11 @@ def _tcp(host: str, port: int, timeout=0.8) -> bool:
 
 def probe(address: str, allow_public: bool = False) -> dict:
     """Which connection methods does this address offer? TCP connect only: no credentials, no requests."""
-    host = address.rsplit(":", 1)[0] if re.search(r":\d+$", address) and address.count(":") == 1 else address
+    m = re.fullmatch(r"(.+):(\d{1,5})", address) if address.count(":") == 1 else None
+    host = m.group(1) if m else address
+    ports = list(PORTS)
+    if m and int(m.group(2)) not in [p[0] for p in ports]:
+        ports.append((int(m.group(2)), "agent", "Technician agent (port you gave)"))  # a port YOU typed; still one address, no scanning
     if not allow_public:
         assert_private_address(host)
     found, lock = [], threading.Lock()
@@ -63,9 +67,9 @@ def probe(address: str, allow_public: bool = False) -> dict:
         if _tcp(host, p[0]):
             with lock:
                 found.append({"port": p[0], "method": p[1], "label": p[2]})
-    ths = [threading.Thread(target=one, args=(p,)) for p in PORTS]
+    ths = [threading.Thread(target=one, args=(p,)) for p in ports]
     [t.start() for t in ths]; [t.join() for t in ths]
-    found.sort(key=lambda f: [p[0] for p in PORTS].index(f["port"]))
+    found.sort(key=lambda f: [p[0] for p in ports].index(f["port"]))
     advice = []
     if any(f["method"] == "agent" for f in found):
         advice.append("Technician agent detected — pair with the code and fingerprint from the client's screen.")
