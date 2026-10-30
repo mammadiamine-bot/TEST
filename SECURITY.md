@@ -22,3 +22,19 @@ No client agent (consent is attested by the technician for real devices) · no p
 
 ## Operating guidance
 Only connect devices whose owner authorized you. Never forward ports for SSH/WinRM; use LAN, Ethernet or Tailscale. Use a dedicated low-privilege Windows account; grant admin only where a repair needs it.
+
+## M2 additions
+| Threat | Control | Tested |
+|---|---|---|
+| Agent impersonation / MITM | self-signed cert per run; fingerprint read from the client's screen and pinned on every connection | yes |
+| Rogue controller on the LAN | pairing code (8 digits, single use, 10 min, lockout after 5) + session token (random 256-bit) | yes |
+| Agent reachable from the Internet | refuses non-private source addresses; controller refuses public targets (except opt-in key-only SSH to your own VPS) | yes |
+| Owner loses control | `d`+Enter / Ctrl+C / close window; session expiry; controller revoke and emergency stop | yes |
+| Escape from project folder | realpath confinement incl. symlinks; no directory deletion; size caps | yes |
+| Shell injection | argv-only execution; server args validated + shlex-quoted through ssh | yes |
+| Personal credentials leaking to clients | no credential field in the agent protocol; agent rejects unknown fields; remote Claude uses the client's own login; generic exec env is scrubbed of KEY/TOKEN/SECRET/PASSWORD | yes |
+| Secrets in logs | argv redaction (passwords/tokens/API keys) in audit and task events | yes |
+| Cross-client leakage | tasks/projects bound to one device (403 otherwise); separate workspace + backup folders per device/project | yes |
+| Destructive/production change | high risk = per-action confirmation; production = typed project/server name; deletions in a push upgrade it to high | yes |
+| Prompt injection via project files | Bash off by default, approvals before push, backups, verification — **mitigation, not elimination** | partly |
+Not covered: OS-level sandbox for Central Claude, agent code signing (needs a certificate), endpoint-security (EDR) interplay — if security software blocks the agent, do not bypass it.

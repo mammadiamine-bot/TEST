@@ -19,3 +19,10 @@ Direct Ethernet: set static IPs (e.g. 169.254.10.1 and .2 / 255.255.0.0). A cabl
 
 ## Offline
 If the Internet is down the header shows "Offline"; diagnostics and reports still work; chat replies are tagged *Scripted*.
+
+## M2: working with a client (agent flow)
+1. Copy the `cit-agent-portable` folder (CI artifact) to a USB drive. At the client: they double-click `start-agent.bat`, choose the project folder and what to allow, and read you the **8-digit code and the fingerprint**.
+2. *Quick Connect* → pick “Portable USB Technician Agent” → enter their address (Ethernet: set 169.254.10.x on both; LAN; or Tailscale 100.x) → *Detect methods* → register with the owner's authorization → type code + fingerprint → *Pair & test*.
+3. *Development Projects* → add the project folder (as it exists on the client) → explore/edit/test, or *AI Workspace* → Development → choose Central or Remote Claude, write the instruction, review the plan, approve, watch the live log, review the diff (Central), check verification, download the report.
+4. Done? Click *Revoke* (or the client types `d`). *EMERGENCY STOP* ends everything at once.
+Remote Claude needs the client to sign in to Claude Code with **their own** account (or API key). Never give them yours.

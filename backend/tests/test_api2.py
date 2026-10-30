@@ -102,3 +102,19 @@ def test_emergency_stop_endpoint_and_device_create_fields(stack):
     r = c.post("/devices", json={"name": "v", "address": "203.0.113.5", "transport": "ssh", "owner_name": "me", "owner_contact": "me@x.io",
                                  "authorization_note": "my own VPS, key-only access", "kind": "server", "allow_public": True})
     assert r.status_code == 201 and r.json()["kind"] == "server"
+
+
+def test_agent_pairing_over_http_accepts_8_digit_code(stack):
+    """Regression: the agent's 8-digit code was rejected by the API's 6-digit validation (found by the browser e2e run)."""
+    c, core, proj = stack
+    ag = cit_agent.Agent([proj], Grants(terminal=True), 30, say=lambda *_: None)
+    srv, fp = cit_agent.serve(ag, "127.0.0.1", 0)
+    d = c.post("/devices", json={"name": "A", "address": f"127.0.0.1:{srv.server_address[1]}", "transport": "agent", "owner_name": "o",
+                                 "owner_contact": "o@x.io", "authorization_note": "owner agreed in writing"}).json()
+    assert "pairing_code" not in d
+    spaced = " ".join(fp[i:i + 8] for i in range(0, 64, 8)).upper()
+    r = c.post(f"/devices/{d['id']}/pair", json={"code": ag.code, "fingerprint": spaced})
+    assert r.status_code == 200 and r.json()["status"] == "paired"
+    t = c.get(f"/devices/{d['id']}/connection-test").json()
+    assert t["ok"] and [k["stage"] for k in t["checks"]] == ["network", "identity", "authentication", "permissions", "tools"]
+    ag.end("done"); srv.shutdown()

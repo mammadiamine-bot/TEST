@@ -31,7 +31,7 @@ class DeviceIn(BaseModel):
 
 
 class PairIn(BaseModel):
-    code: str = Field(min_length=6, max_length=6)
+    code: str = Field(min_length=6, max_length=8)  # 6 digits: controller-issued; 8 digits: shown by the agent on the client's screen
     fingerprint: str = Field(default="", max_length=200)
     host_key: str | None = Field(default=None, max_length=2000)
 
