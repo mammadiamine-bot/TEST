@@ -21,7 +21,8 @@ Run with `tools/worker_check.py` through the controller API (the path the dashbo
 | PASS | cancellation of a running job | cancelled=True, done=True |
 | PASS | audit log | 18 entries |
 | PASS | controller restart → reconnect without re-enrolling | after restart: state `online`, authenticated call returned the host |
-| NOT RUN | reconnect after a real network interruption of the Worker (Wi-Fi off/on) | needs the owner at the Worker; see next steps |
+| PASS | automatic reconnect after a real Wi-Fi outage of the Worker (owner switched Wi-Fi off/on) | 16:39:53 port unreachable → 16:41:23 port back → 16:41:27 controller `online` again by itself; no re-enrollment, credential still valid, worker unlocked |
+| FINDING | controller notices an outage slowly | status stayed `online` for ~70 s after the drop (flipped to `reconnecting` at 16:41:03): health probes use a 15 s timeout with GET retries on a 10 s poll. A first attempt (short drop) was not noticed at all. Not fixed yet. |
 | NOT RUN | Claude Code **task** on the worker | not approved / no separate login checked |
 | NOT RUN | revoke / lock from the Worker | destructive to the connection; run last, with the owner |
 | NOT DONE | automatic start at Windows logon | awaiting owner approval; no scheduled task exists |
