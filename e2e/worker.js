@@ -32,8 +32,8 @@ const wk = (...a) => ['python3', [`${R}/worker/cit_worker.py`, '--data-dir', `${
   await p.click('button:text-is("Live log")'); await p.waitForSelector('pre:has-text("started")', { timeout: 10000 }); await p.screenshot({ path: path.join(W, 'queue-log.png') });
   console.log('log shows streamed events:', (await p.locator('pre').innerText()).split('\n').length > 3);
   await p.click('button:text-is("Security")'); await p.waitForSelector('text=Controller credentials'); 
-  await p.click('nav >> text="AI Worker Stations"'); await p.click('button:text-is("Overview")'); await p.click('button:has-text("Emergency stop this worker")'); await p.waitForSelector('text=LOCKED', { timeout: 15000 });
-  console.log('worker locked from the dashboard:', /LOCKED/.test(wout) || true);
+  await p.click('nav >> text="AI Worker Stations"'); await p.click('main button:text-is("Overview")'); await p.click('button:has-text("Emergency stop this worker")'); await p.waitForSelector('text=LOCKED', { timeout: 15000 });
+  console.log('dashboard shows the worker as LOCKED after emergency stop (waited for the UI element)');
   await p.click('nav >> text=العربية'); await p.screenshot({ path: path.join(W, 'rtl.png') });
   console.log('console errors:', JSON.stringify(errs.filter(e => !/Failed to load resource|423/.test(e)))); console.log('screenshots in', W);
   await b.close();
