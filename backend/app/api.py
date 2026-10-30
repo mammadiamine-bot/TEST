@@ -259,4 +259,10 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     rmm_router = build_tenancy_router(core, workers)
     app.include_router(rmm_router)
     app.include_router(rmm_router.public)
+    from .api5 import build_router as build_monitor_router
+    from .monitor import Monitor
+    monitor = Monitor(core.db)
+    workers.listeners.append(monitor.on_poll)
+    app.state.monitor = monitor
+    app.include_router(build_monitor_router(core, monitor))
     return app

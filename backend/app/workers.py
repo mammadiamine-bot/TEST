@@ -20,6 +20,7 @@ ALLOWED = re.compile(r"^/(status|clients(/[a-z0-9_-]+(/(secrets(/[A-Z0-9_]+)?|pr
 
 class Workers:
     def __init__(self, core: Core, monitor_interval: float = 10.0):
+        self.listeners: list = []  # called as f(worker_id, online, status) after every health poll
         self.core, self.db = core, core.db
         self.clients: dict[str, WorkerClient] = {}
         self.state: dict[str, dict] = {}
@@ -154,6 +155,11 @@ class Workers:
             self.db.execute("UPDATE workers SET last_seen=?,status='online' WHERE id=? AND status IN ('enrolled','offline','online')", (time.time(), wid))
         else:
             self.db.execute("UPDATE workers SET status='offline' WHERE id=? AND status IN ('enrolled','online')", (wid,))
+        for f in self.listeners:
+            try:
+                f(wid, online, self.state[wid]['status'])
+            except Exception:  # noqa: BLE001 - monitoring must never break the health poll
+                pass
         if prev is not None and prev != online:
             self.db.audit("system", "worker.reconnected" if online else "worker.offline", None, worker=wid)
 
