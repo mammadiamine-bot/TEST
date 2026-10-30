@@ -19,6 +19,9 @@ from .netpolicy import NetworkPolicyError, assert_private_address
 from .security import SecretProtector, default_protector
 from .tools import Risk, ToolError
 from .transports.base import Transport, TransportError
+from .targets import LocalTarget
+from .targetcore import Grants, TargetError
+from .transports.agent import AgentClient, norm_fp
 from .transports.mock import SCENARIOS, MockTransport
 
 
@@ -55,6 +58,8 @@ class Core:
         self.transports: dict[str, Transport] = {}
         self._attempts: dict[str, int] = {}
         self._dev_locks: dict[str, threading.Lock] = {}
+        self.stop_hooks: list = []
+        self._local = None
 
     # ---------------------------------------------------------------- connectivity
     def _probe(self) -> bool:
@@ -65,18 +70,28 @@ class Core:
             return False
 
     # ---------------------------------------------------------------- devices & pairing
-    def create_device(self, name, address, transport, owner_name, owner_contact, authorization_note, scenario=None, actor="technician") -> dict:
-        if transport not in ("mock", "ssh", "winrm"):
-            raise CoreError("transport must be mock, ssh or winrm")
+    def create_device(self, name, address, transport, owner_name, owner_contact, authorization_note, scenario=None, actor="technician",
+                      kind="workstation", allow_public=False) -> dict:
+        if transport not in ("mock", "ssh", "winrm", "agent"):
+            raise CoreError("transport must be mock, ssh, winrm or agent")
+        if kind not in ("workstation", "server"):
+            raise CoreError("kind must be workstation or server")
         if transport == "mock":
             if not self.s.allow_mock:
                 raise CoreError("mock devices are disabled")
             scenario = scenario or "broken"
             if scenario not in SCENARIOS:
                 raise CoreError("unknown scenario")
+        elif allow_public:
+            # Outbound key-only SSH to a VPS you operate. Never allowed for the agent (it only accepts private sources) or WinRM.
+            if not (transport == "ssh" and kind == "server"):
+                raise CoreError("public addresses are only allowed for SSH servers (VPS)", 422)
+            if len(authorization_note) < 20:
+                raise CoreError("describe your authorization for this public server (20+ characters)", 422)
+            self.db.audit(actor, "device.public_server_ack", None, address=address)
         else:
             try:
-                assert_private_address(address)
+                assert_private_address(address.rsplit(":", 1)[0] if transport == "agent" and ":" in address else address)
             except NetworkPolicyError as e:
                 self.db.audit(actor, "device.rejected", None, address=address, reason=str(e))
                 raise CoreError(str(e), 422)
@@ -85,10 +100,13 @@ class Core:
             "INSERT INTO devices(id,name,address,transport,owner_name,owner_contact,authorization_note,status,pairing_hash,pairing_expires,scenario,created_at)"
             " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (did, name, address, transport, owner_name, owner_contact, authorization_note, "pending_pairing",
-             _h(code), self.now() + self.s.pairing_ttl_seconds, scenario, self.now()))
+             _h(code) if transport != "agent" else None, self.now() + self.s.pairing_ttl_seconds, scenario, self.now()))
+        self.db.execute("UPDATE devices SET scenario=? WHERE id=?", (f"kind={kind}" if transport != "mock" else scenario, did))
         self.db.audit(actor, "device.create", did, name=name, transport=transport, owner=owner_name)
         d = self.device(did)
-        d["pairing_code"] = code  # shown once to the technician; client must confirm it
+        d["kind"] = kind
+        if transport != "agent":  # agent devices get their code from the CLIENT's screen, never from us
+            d["pairing_code"] = code
         return d
 
     def device(self, did: str) -> dict:
@@ -96,6 +114,8 @@ class Core:
         if not d:
             raise CoreError("device not found", 404)
         d.pop("pairing_hash", None)
+        d["kind"] = "server" if (d.get("scenario") or "") == "kind=server" else ("control" if d["transport"] == "local" else "workstation")
+        d["live"] = d["id"] in self.transports or d["transport"] == "local"
         return d
 
     def devices(self) -> list[dict]:
@@ -105,6 +125,8 @@ class Core:
         row = self.db.one("SELECT * FROM devices WHERE id=?", (did,))
         if not row:
             raise CoreError("device not found", 404)
+        if row["transport"] == "agent":
+            return self.connect_agent(did, code, fingerprint, actor)
         if row["status"] != "pending_pairing":
             raise CoreError("device is not awaiting pairing", 409)
         self._throttle(f"pair:{did}")
@@ -127,6 +149,105 @@ class Core:
         self.db.audit(actor, "device.paired", did, fingerprint=fingerprint)
         return self.device(did)
 
+    # ---------------------------------------------------------------- portable agent (consent happens on the CLIENT's screen)
+    def connect_agent(self, did: str, code: str, fingerprint: str, actor="technician") -> dict:
+        row = self.db.one("SELECT * FROM devices WHERE id=?", (did,))
+        if not row or row["transport"] != "agent":
+            raise CoreError("not an agent device", 404)
+        if row["status"] == "revoked":
+            raise CoreError("device was revoked", 403)
+        host, _, port = row["address"].partition(":")
+        if not fingerprint or len(norm_fp(fingerprint)) != 64:
+            raise CoreError("enter the fingerprint shown on the client's screen (64 hex characters)", 422)
+        self._throttle(f"agent:{did}", 8)
+        client = AgentClient(host, int(port or 8766), fingerprint)
+        try:
+            res = client.pair(code, "technician-station")
+        except TargetError as e:
+            self.db.audit(actor, "agent.pair_failed", did, reason=str(e)); raise CoreError(str(e), e.status)
+        except Exception as e:  # noqa: BLE001  (TransportError: unreachable / identity mismatch)
+            self.db.audit(actor, "agent.pair_failed", did, reason=str(e)); raise CoreError(str(e), 502)
+        self.transports[did] = client
+        scope = "repair" if set(res["grants"]) & {"repair", "write", "terminal", "claude"} else "diagnose"  # any state-changing grant
+        t = self.now()
+        for s_ in self.db.all("SELECT id FROM sessions WHERE device_id=? AND status IN ('requested','active')", (did,)):
+            self.db.execute("UPDATE sessions SET status='revoked',ended_at=? WHERE id=?", (t, s_["id"]))
+        sid = new_id("ses")
+        mins = max(1, int((res["expires_at"] - time.time()) / 60))
+        self.db.execute("INSERT INTO sessions(id,device_id,scope,status,requested_by,consenting_person,duration_minutes,created_at,activated_at,expires_at)"
+                        " VALUES(?,?,?,?,?,?,?,?,?,?)", (sid, did, scope, "active", actor, "client (agent console)", mins, t, t, t + (res["expires_at"] - time.time())))
+        self.db.execute("UPDATE devices SET status='paired',fingerprint=? WHERE id=?", (norm_fp(fingerprint), did))
+        self.db.audit(actor, "agent.paired", did, fingerprint=norm_fp(fingerprint), grants=res["grants"], session=sid)
+        return self.device(did)
+
+    def agent(self, did: str) -> AgentClient:
+        c = self.transports.get(did)
+        if not isinstance(c, AgentClient):
+            raise CoreError("agent session is not connected — ask the client to start the agent and pair again", 409)
+        return c
+
+    # ---------------------------------------------------------------- targets (machine + project directories)
+    def local_target(self) -> LocalTarget:
+        if getattr(self, "_local", None) is None:
+            roots = [Path(r) for r in self.s.local_roots] or [self.s.data_dir / "workspaces"]
+            for r in roots:
+                r.mkdir(parents=True, exist_ok=True)
+            self._local = LocalTarget(roots, Grants(terminal=True, write=True, claude=True))
+        return self._local
+
+    def ensure_local_device(self) -> dict:
+        r = self.db.one("SELECT id FROM devices WHERE transport='local'")
+        if r:
+            return self.device(r["id"])
+        did = new_id("dev")
+        self.db.execute("INSERT INTO devices(id,name,address,transport,owner_name,owner_contact,authorization_note,status,scenario,created_at)"
+                        " VALUES(?,?,?,?,?,?,?,?,?,?)", (did, "This computer (control station)", "localhost", "local", "Technician", "-",
+                                                         "The technician's own computer", "paired", None, self.now()))
+        self.db.audit("system", "device.local_registered", did)
+        return self.device(did)
+
+    def target(self, did: str, need_session: str = "diagnose"):
+        """The only way dev/server/task code reaches a machine's filesystem or shell."""
+        d = self.device(did)
+        if d["transport"] == "local":
+            return self.local_target()
+        self._require(did, need_session)
+        if d["transport"] == "agent":
+            return self.agent(did)
+        if d["transport"] == "ssh" and d["kind"] == "server":
+            return self.ssh_target(d)
+        raise CoreError(f"{d['transport']} devices have no project/terminal access (use the agent or SSH to a Linux server)", 501)
+
+    def ssh_target(self, d: dict):
+        from .servers import LinuxSshTarget
+        row = self.db.one("SELECT blob FROM credentials WHERE device_id=?", (d["id"],))
+        if not row:
+            raise CoreError("no stored SSH credentials for this server (needs Windows DPAPI)", 409)
+        c = json.loads(self.protector.unprotect(row["blob"]))
+        host, _, port = d["address"].partition(":")
+        key = (self.s.data_dir / "known_hosts" / d["id"])
+        return LinuxSshTarget(host, c["user"], c["key_path"], key, int(port or 22), self.s.ssh_bin)
+
+    def emergency_stop(self, actor="technician") -> dict:
+        """Kill switch: end every session, disconnect every agent, cancel every job."""
+        n_s = 0
+        for s_ in self.db.all("SELECT id,device_id FROM sessions WHERE status IN ('requested','active')"):
+            self.db.execute("UPDATE sessions SET status='revoked',ended_at=? WHERE id=?", (self.now(), s_["id"])); n_s += 1
+        n_t = 0
+        for did, tr in list(self.transports.items()):
+            if hasattr(tr, "disconnect"):
+                try:
+                    tr.disconnect(); n_t += 1
+                except Exception:  # noqa: BLE001
+                    pass
+            self.transports.pop(did, None)
+        if getattr(self, "_local", None):
+            self._local.disconnect()
+        for hook in self.stop_hooks:
+            hook()
+        self.db.audit(actor, "emergency.stop", None, sessions=n_s, disconnected=n_t)
+        return {"sessions_revoked": n_s, "targets_disconnected": n_t}
+
     def set_credentials(self, did: str, creds: dict) -> None:
         self.device(did)
         blob = self.protector.protect(json.dumps(creds).encode())
@@ -138,7 +259,9 @@ class Core:
         self.db.execute("UPDATE devices SET status='revoked',revoked_at=? WHERE id=?", (self.now(), did))
         self.db.execute("UPDATE sessions SET status='revoked',ended_at=? WHERE device_id=? AND status IN ('requested','active')", (self.now(), did))
         self.db.execute("DELETE FROM credentials WHERE device_id=?", (did,))
-        self.transports.pop(did, None)
+        tr = self.transports.pop(did, None)
+        if tr is not None and hasattr(tr, "disconnect"):
+            tr.disconnect()
         self.db.audit(actor, "device.revoked", did)
         return self.device(did)
 
@@ -201,6 +324,9 @@ class Core:
         s = self.session(sid)
         if s["status"] in ("requested", "active"):
             self.db.execute("UPDATE sessions SET status='revoked',ended_at=? WHERE id=?", (self.now(), sid))
+            tr = self.transports.get(s["device_id"])
+            if isinstance(tr, AgentClient):
+                tr.disconnect(); self.transports.pop(s["device_id"], None)
             self.db.audit(actor, "session.revoked", s["device_id"], session=sid)
         return self.session(sid)
 

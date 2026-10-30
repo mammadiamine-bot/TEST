@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, downloadReport } from "./api";
 import { t } from "./i18n";
 
-export type Device = { id: string; name: string; address: string; transport: string; status: string; owner_name: string; fingerprint?: string };
+export type Device = { kind?: string; live?: boolean; id: string; name: string; address: string; transport: string; status: string; owner_name: string; fingerprint?: string };
 export type Finding = { id: string; module: string; severity: string; title: string; evidence: string; suggested: { tool_id: string }[] };
 export type Step = { id: string; tool_id: string; title: string; risk: string; status: string; rationale: string; approved_by?: string; result?: { verified: boolean; detail: string } };
 export type Plan = { id: string; status: string; steps: Step[]; before_findings: Finding[]; after?: { findings: Finding[] } };

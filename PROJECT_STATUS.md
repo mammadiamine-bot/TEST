@@ -1,7 +1,44 @@
 # PROJECT_STATUS — Claude IT Technician
 
-Last updated: 2026-10-30 · Milestone **M1 (MVP, mock devices only)**
-**NOT production-ready.** Nothing here has run against a real Windows computer.
+Last updated: 2026-10-30 · **M1** (MVP, mock devices) + **M2** (universal workspace) — both on branch `ccr-c7017ed0-jcu40v`, PR #2
+**NOT production-ready.** No real client computer has been paired. Claude Code itself has never been run by this project's tests (a labelled test double stands in).
+
+## Legend (also shown live in Settings → Feature status, from `backend/app/features.py`)
+tested = automated tests pass · untested = code exists, never run against the real thing · mock = simulated only · planned = not built · blocked = needs something external
+
+## M2 — what changed (everything from M1 is kept; 135 backend tests, up from 55)
+| Area | Status | Evidence / caveat |
+|---|---|---|
+| Portable agent `agent/cit_agent.py` (TLS cert pinning, 8-digit single-use code, 5-attempt lockout, per-owner grants: terminal/write/repair/claude, session expiry, `d`+Enter / Ctrl+C disconnect, temp cert files deleted, refuses public source IPs, unknown JSON fields rejected so no credential field can exist) | **tested** | 16 loopback tests + `--selftest` (also run in CI on Linux and on a Windows runner) |
+| Agent as a Windows `.exe` + USB folder (`start-agent.bat`, README) | **untested** | CI job `agent-windows` builds it and runs `--selftest`; check the Actions result. Windows never auto-runs USB programs, so the client starts it |
+| Targets: one API for agent, this computer, Linux SSH servers; confined filesystem (symlink-safe), argv-only exec, scrubbed env, capped output, cancel/timeout | **tested** | agent + local; SSH via a fake `ssh` that executes the remote string through `sh` (proves quoting) |
+| Existing Windows diagnostics/repairs now also run through the agent | **untested** on Windows | routed + grant-checked in tests with an injected PowerShell runner |
+| Dev workspace: projects, explorer, editor (keeps previous version on every save), git status/diff, build/test, restricted terminal, backup/rollback, environment info | **tested** | agent + local targets |
+| Task engine: identify target → verify authorization+connection → detect tools → choose Central/Remote → plan → approvals → live events → verify → report; kinds dev / diagnose / install_tools / server / deploy | **tested** machinery | with the `fake_claude` double |
+| Central Claude (Claude Code on this laptop against a local mirror; diff review; approved push with read-back verification; rollback) | **untested** with real Claude | needs `claude` installed + logged in on this laptop |
+| Remote Claude (Claude Code on the client PC through the agent; project backed up first; streamed output; cancel; client's own login) | **untested** with real Claude | needs `--allow-claude` on the agent and the client to log in themselves |
+| Server manager: 19 allowlisted Linux actions (systemd/docker/nginx/logs/network/backup), sudo -n for root, typed-name confirmation for production changes | **untested** on a real server | quoting/gating tested; read-only actions executed for real on this Linux box through the fake ssh |
+| Connections: port probe, staged connection test with troubleshooting hints, git check (real `git ls-remote` on a local repo), Tailscale peers, RustDesk launch (no password on CLI) | probe/git **tested**; Tailscale/RustDesk **untested** | no tailnet / RustDesk here |
+| Public SSH only for `kind=server` + explicit acknowledgement; never for agent/WinRM | **tested** | |
+| Emergency stop (revoke sessions, disconnect agents, cancel jobs) | **tested** | API, UI button, real agent process stopped in the browser e2e |
+| UI: 14 sections (all M1 pages still reachable as tabs), AR/EN + RTL, task view with approvals/live log/diff | **tested** | `e2e/universal.js`: real browser + real backend + real agent process + test-double Claude; found and fixed a real bug (API rejected the agent's 8-digit code) |
+| Windows installer | **untested** | CI built the NSIS installer green (M1); never installed or run |
+
+## Known gaps / blocked (honest list)
+- **Real Claude never exercised**: the flag set (`-p --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools …`) is from documentation knowledge; first run on a real login may need adjustments. Central-mode isolation between clients relies on a per-device/per-project working directory + restricted tools, not an OS sandbox.
+- Prompt-injection risk: project files can contain text aimed at Claude. Mitigations: file-edit-only tools by default (Bash off), approvals before anything is pushed, backups, verification. Not eliminated.
+- Remote desktop: RustDesk is launched, not embedded; Tailscale is read-only (peer list). Cloud-service/API connections: planned.
+- Persistent installed agent and graphical agent window: planned (console window is the visible indicator).
+- Agent session token is memory-only: if this app restarts, the client must pair again (no silent reconnect). Running jobs stay on the agent until the session ends.
+- Windows-only pieces (PowerShell scripts, DPAPI store, SSH/WinRM to Windows, installer run, signing) still need a real Windows test PC. Code signing needs a certificate.
+- Server SFTP is `ssh cat/ls`, not the SFTP protocol. No Windows Server management beyond the existing PowerShell tools.
+- Single local API token; no per-technician accounts.
+- HawkScan DAST not run (no `HAWK_API_KEY`).
+
+## What I need from you to move to M3
+1. A Windows test PC you own (or a VM) with the agent copied over → I can verify the PowerShell scripts, the agent .exe and the installer.
+2. `claude` installed and signed in on this laptop (for Central) and, on a test client, signed in with the client's own account (for Remote).
+3. Optionally one test Linux VPS (key-only SSH) for server actions.
 
 ## Environment (authoring)
 Linux cloud container. Python 3.13, Node 22, Rust 1.97. **No Windows, no PowerShell, no WebView2** → Windows-specific parts could not be executed.

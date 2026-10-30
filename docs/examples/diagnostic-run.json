@@ -1,7 +1,7 @@
 {
-  "id": "run_7d6f49f040ed",
-  "device_id": "dev_af2b88f3bf89",
-  "created_at": 1793340171.4012306,
+  "id": "run_d11032f8ee54",
+  "device_id": "dev_e736aa6e2fe7",
+  "created_at": 1793342393.871157,
   "modules": [
     "cpu_ram",
     "performance",
@@ -19,7 +19,7 @@
   ],
   "data": {
     "cpu_ram": {
-      "cpu_percent": 53,
+      "cpu_percent": 17,
       "ram_total_gb": 16.0,
       "ram_used_gb": 15.1,
       "ram_percent": 94

@@ -32,3 +32,6 @@ pre{background:#030a18;border:1px solid var(--line);border-radius:8px;padding:10
 .tag{font-size:11px;color:var(--mut)}
 svg.spark{width:100%;height:60px}
 @media(max-width:800px){.app{grid-template-columns:1fr}nav{flex-direction:row;overflow-x:auto;border-inline-end:0;border-bottom:1px solid var(--line)}}
+button.card{color:inherit;font:inherit}button.card.sel{border-color:var(--acc);background:var(--panel2)}
+details>summary{cursor:pointer;color:var(--mut)}ol{padding-inline-start:20px;margin:6px 0}
+.pill.info{color:var(--mut)}
