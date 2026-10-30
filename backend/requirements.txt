@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+reportlab>=4.0
+# optional transports / AI (lazy-imported):
+# pywinrm>=0.4          # WinRM transport
+# claude-agent-sdk      # Claude provider
