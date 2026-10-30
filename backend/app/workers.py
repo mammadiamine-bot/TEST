@@ -49,7 +49,12 @@ class Workers:
 
     def view(self, r: dict) -> dict:
         st = self.state.get(r["id"], {})
-        return {**r, "online": st.get("online", False), "resources": st.get("status"), "credential_loaded": r["id"] in self.clients and bool(self.clients[r["id"]].token)}
+        loaded = r["id"] in self.clients and bool(self.clients[r["id"]].token)
+        online = st.get("online", False)
+        seen = st.get("seen") or r.get("last_seen")
+        # needs_pairing: no controller credential; reconnecting: offline but seen within 10 min (the monitor keeps retrying); else offline
+        state = "online" if online else ("needs_pairing" if not loaded else ("reconnecting" if seen and time.time() - seen < 600 else "offline"))
+        return {**r, "online": online, "state": state, "resources": st.get("status"), "credential_loaded": loaded}
 
     def get(self, wid: str) -> dict:
         r = self.db.one("SELECT * FROM workers WHERE id=?", (wid,))

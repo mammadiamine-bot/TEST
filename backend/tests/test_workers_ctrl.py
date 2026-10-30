@@ -60,6 +60,18 @@ def test_enroll_flow_status_and_resources(ctrl):
     assert tok not in str(ctrl.w.store.all("SELECT * FROM audit"))
 
 
+def test_dashboard_states_online_needs_pairing_reconnecting_offline(ctrl):
+    wid = add(ctrl).json()["id"]
+    assert ctrl.c.get("/workers").json()[0]["state"] == "needs_pairing"  # registered, never enrolled: no credential
+    assert ctrl.c.post(f"/workers/{wid}/enroll", json={"code": ctrl.w.new_enroll_code()}).json()["online"]
+    assert next(x for x in ctrl.c.get("/workers").json() if x["id"] == wid)["state"] == "online"
+    mgr = ctrl.app.state.workers
+    mgr.state[wid] = {"online": False, "status": None, "seen": time.time() - 30}  # just lost: the monitor keeps retrying
+    assert next(x for x in ctrl.c.get("/workers").json() if x["id"] == wid)["state"] == "reconnecting"
+    mgr.state[wid] = {"online": False, "status": None, "seen": time.time() - 3600}
+    assert next(x for x in ctrl.c.get("/workers").json() if x["id"] == wid)["state"] == "offline"
+
+
 def test_proxy_allowlist_and_audit_never_logs_secret_values(ctrl):
     wid = enroll(ctrl)
     assert ctrl.c.get(f"/workers/{wid}/w/audit").status_code == 200

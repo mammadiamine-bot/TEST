@@ -18,6 +18,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import ssl
 import sqlite3
 import subprocess
@@ -819,8 +820,11 @@ class Worker:
 TASK_NAME = "Claude IT Technician Worker"
 
 
-def service_commands(exe: str, data_dir: str, user: str) -> dict:
-    return {"install": ["schtasks", "/Create", "/TN", TASK_NAME, "/TR", f'"{exe}" run --data-dir "{data_dir}"', "/SC", "ONSTART", "/RU", user, "/RL", "LIMITED", "/F"],
+def service_commands(exe: str, data_dir: str, user: str, bind: str = "127.0.0.1", port: int = 8777) -> dict:
+    # At log on of that user, interactive only (/IT): no stored password, runs in the user's session so DPAPI works.
+    # --data-dir is a global option and must precede `run`.
+    return {"install": ["schtasks", "/Create", "/TN", TASK_NAME, "/TR", f'"{exe}" --data-dir "{data_dir}" run --bind {bind} --port {port}',
+                        "/SC", "ONLOGON", "/IT", "/RU", user, "/RL", "LIMITED", "/F"],
             "remove": ["schtasks", "/Delete", "/TN", TASK_NAME, "/F"], "show": ["schtasks", "/Query", "/TN", TASK_NAME]}
 
 
@@ -962,6 +966,13 @@ def serve(w: Worker, bind: str, port: int):
     ctx, fp = w.ssl_context()
 
     class Quiet(ThreadingHTTPServer):
+        allow_reuse_address = os.name != "nt"  # on Windows SO_REUSEADDR lets a second process bind the same port and receive connections
+
+        def server_bind(self):
+            if os.name == "nt":
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            super().server_bind()
+
         def handle_error(self, request, client_address): pass
 
     srv = Quiet((bind, port), make_handler(w)); srv.socket = ctx.wrap_socket(srv.socket, server_side=True); srv.daemon_threads = True
@@ -971,12 +982,30 @@ def serve(w: Worker, bind: str, port: int):
 
 
 # ------------------------------------------------------------------ CLI
+def single_instance(data_dir: Path):
+    """Non-blocking exclusive lock on <data-dir>/instance.lock; None if another worker already owns this data directory."""
+    f = open(data_dir / "instance.lock", "a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0); msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close(); return None
+    return f
+
+
 def default_dir() -> Path:
     base = os.environ.get("PROGRAMDATA") if os.name == "nt" else str(Path.home())
     return Path(base or ".") / ("ClaudeITWorker" if os.name == "nt" else ".cit-worker")
 
 
 def main(argv=None) -> int:
+    for stream in (sys.stdout, sys.stderr):  # a frozen exe buffers when not on a console (boot task, pipe): the banner/log would never appear
+        if stream and hasattr(stream, "reconfigure"):
+            stream.reconfigure(line_buffering=True)
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--data-dir", type=Path, default=default_dir()); p.add_argument("--dev-insecure-store", action="store_true", help="non-Windows testing only: file-key secret store (NOT OS-backed)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -987,7 +1016,7 @@ def main(argv=None) -> int:
     sub.add_parser("lock", help="immediately lock: stop all jobs, refuse everything"); sub.add_parser("unlock"); sub.add_parser("revoke-all", help="revoke every controller credential")
     sub.add_parser("status")
     f = sub.add_parser("firewall-script", help="print a PowerShell script isolating the client's LAN"); f.add_argument("--infra", default="", help="comma-separated gateway/DNS IPs to keep reachable")
-    s = sub.add_parser("service", help="install/remove the visible scheduled task"); s.add_argument("action", choices=["install", "remove", "show"]); s.add_argument("--user", default=""); s.add_argument("--i-understand", action="store_true", help="required for install: the worker will start at boot, visibly, as the named task")
+    s = sub.add_parser("service", help="install/remove the visible scheduled task"); s.add_argument("action", choices=["install", "remove", "show"]); s.add_argument("--user", default=""); s.add_argument("--bind", default="127.0.0.1", help="address the boot task listens on (this PC's private LAN/Tailscale address)"); s.add_argument("--port", type=int, default=8777); s.add_argument("--i-understand", action="store_true", help="required for install: the worker will start at boot, visibly, as the named task")
     wp = sub.add_parser("wipe", help="securely remove all worker data"); wp.add_argument("--name", required=True)
     sub.add_parser("selftest")
     a = p.parse_args(argv)
@@ -996,13 +1025,17 @@ def main(argv=None) -> int:
     if a.cmd == "selftest":
         return selftest()
     if a.cmd == "service":
-        cmds = service_commands(sys.executable if not getattr(sys, "frozen", False) else sys.executable, str(a.data_dir), a.user)
+        cmds = service_commands(sys.executable if not getattr(sys, "frozen", False) else sys.executable, str(a.data_dir), a.user, a.bind, a.port)
         if a.action == "install" and not (a.i_understand and a.user):
             print("Refusing: pass --user <windows account> and --i-understand.\nThis creates the visible scheduled task:", " ".join(cmds["install"])); return 2
         print(" ".join(cmds[a.action]))
         if os.name == "nt":
             return subprocess.run(cmds[a.action]).returncode
         print("(not Windows: command printed only)"); return 0
+    if a.cmd == "run":
+        instance_lock = single_instance(a.data_dir)  # held until the process exits
+        if instance_lock is None:
+            print(f"Another worker is already running with data directory {a.data_dir}. Not starting a second one."); return 3
     w = Worker(a.data_dir, prot, auto_resume=getattr(a, "auto_resume", False), max_parallel=getattr(a, "max_parallel", 1))
     if a.cmd == "enroll":
         print(f"Enrollment code (valid 10 minutes, single use): {w.new_enroll_code()}"); return 0

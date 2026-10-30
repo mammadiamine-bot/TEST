@@ -487,11 +487,51 @@ def test_wipe_requires_name_and_removes_everything(tmp_path, fakebin):
 
 
 def test_service_install_is_explicit_visible_and_removable(tmp_path):
-    cmds = cw.service_commands(r"C:\Program Files\CIT\cit-worker.exe", r"C:\ProgramData\ClaudeITWorker", "citworker")
-    assert cmds["install"][:4] == ["schtasks", "/Create", "/TN", "Claude IT Technician Worker"] and "ONSTART" in cmds["install"] and "LIMITED" in cmds["install"]
+    cmds = cw.service_commands(r"C:\Program Files\CIT\cit-worker.exe", r"C:\ProgramData\ClaudeITWorker", "citworker", "192.168.1.105", 8777)
+    ins = cmds["install"]
+    assert ins[:4] == ["schtasks", "/Create", "/TN", "Claude IT Technician Worker"] and "LIMITED" in ins
+    assert "ONLOGON" in ins and "/IT" in ins and "/RP" not in ins and "ONSTART" not in ins  # at log on, interactive-only, no stored password
+    tr = ins[ins.index("/TR") + 1]  # --data-dir is a GLOBAL option: it must come before `run` or argparse rejects the task's command line
+    assert tr.index("--data-dir") < tr.index(" run ") and "--bind 192.168.1.105" in tr and "--port 8777" in tr
     assert cmds["remove"][:3] == ["schtasks", "/Delete", "/TN"]
     assert cw.main(["--data-dir", str(tmp_path), "service", "install"]) == 2  # refuses without --user and --i-understand
     assert not (tmp_path / "nothing").exists()
+
+
+def test_task_command_line_actually_parses(tmp_path):
+    import argparse, shlex
+    cmds = cw.service_commands("cit-worker.exe", str(tmp_path), "u", "127.0.0.1", 8777)
+    tr = cmds["install"][cmds["install"].index("/TR") + 1]
+    argv = shlex.split(tr.replace("\\", "/"))[1:]  # what the exe would receive
+    p = argparse.ArgumentParser(); p.add_argument("--data-dir"); sub = p.add_subparsers(dest="cmd")
+    r = sub.add_parser("run"); r.add_argument("--bind"); r.add_argument("--port", type=int)
+    assert p.parse_args(argv).cmd == "run"
+
+
+def test_only_one_worker_per_data_dir(tmp_path):
+    first = cw.single_instance(tmp_path)
+    assert first is not None
+    assert cw.single_instance(tmp_path) is None  # a second instance on the same data directory is refused
+    first.close()
+    again = cw.single_instance(tmp_path)
+    assert again is not None
+    again.close()
+
+
+def test_server_port_is_not_shareable_on_windows(tmp_path):
+    import os, socket
+    if os.name != "nt":
+        pytest.skip("Windows-only port semantics")
+    w = cw.Worker(tmp_path, cw.FileKeyProtector(tmp_path), say=lambda *_: None, tick=0.1)
+    srv, _ = cw.serve(w, "127.0.0.1", 0)
+    try:
+        port = srv.server_address[1]
+        s2 = socket.socket(); s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with pytest.raises(OSError):
+            s2.bind(("127.0.0.1", port))
+        s2.close()
+    finally:
+        srv.shutdown(); w.stop.set()
 
 
 def test_secret_store_refuses_without_os_protection(tmp_path):

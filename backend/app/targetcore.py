@@ -146,6 +146,11 @@ DETECT = {
 }
 
 
+# Tools that must actually run: on Windows `python.exe` is often a Microsoft Store alias that sits on PATH
+# but only prints "Python was not found; run without arguments to install from the Microsoft Store" and exits non-zero.
+MUST_RUN = {"python"}
+
+
 def detect_tools(names: list[str] | None = None) -> dict[str, dict]:
     res = {}
     for name in names or DETECT:
@@ -157,8 +162,13 @@ def detect_tools(names: list[str] | None = None) -> dict[str, dict]:
                 p = subprocess.run([path, *argv[1:]], capture_output=True, text=True, timeout=8)
                 txt = (p.stdout or p.stderr).strip().splitlines()
                 info["version"] = txt[0][:80] if txt else None
+                if name in MUST_RUN and (p.returncode != 0 or not (info["version"] or "").lower().startswith("python ")):
+                    info["found"], info["version"] = False, None
+                    info["note"] = "on PATH but does not run (Microsoft Store alias?)"
             except (OSError, subprocess.TimeoutExpired):
                 info["version"] = None
+                if name in MUST_RUN:
+                    info["found"] = False
         res[name] = info
     return res
 

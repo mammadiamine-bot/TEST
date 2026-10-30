@@ -99,10 +99,11 @@ def test_disconnect_is_immediate_and_stops_jobs(paired):
     jid = c.exec_start([sys.executable, "-c", "import time;time.sleep(60)"], str(proj), 60)
     time.sleep(0.3)
     c.disconnect()
-    assert ag.ended.is_set()
+    assert ag.token is None and ag.revoked  # revoked BEFORE the reply: 'OK' means access is already gone
     assert ag.jobs.get(jid).cancelled
     with pytest.raises(TargetError):
         c.info()
+    assert ag.ended.wait(3)  # process shutdown follows the reply
 
 
 def test_owner_can_end_session_locally(paired):

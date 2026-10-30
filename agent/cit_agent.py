@@ -75,20 +75,26 @@ class Agent:
         self.expires_at: float | None = None
         self.controller = ""
         self.ended = threading.Event()
+        self.revoked = False
         self.end_reason = ""
         self.ps_runner = ps_runner or self._powershell
         self.lock = threading.Lock()
 
     # ---- lifecycle
-    def end(self, reason: str) -> None:
+    def revoke(self, reason: str) -> None:
+        """Token invalid + running jobs stopped, synchronously. /disconnect calls this BEFORE replying, so 'OK' means access is already gone."""
         with self.lock:
-            if self.ended.is_set():
+            if self.revoked:
                 return
+            self.revoked = True
             self.end_reason = reason
             self.token = None
             n = self.jobs.cancel_all() if self.jobs else 0
             self.say(f"[{time.strftime('%H:%M:%S')}] SESSION ENDED: {reason}" + (f" ({n} running task(s) stopped)" if n else ""))
-            self.ended.set()
+
+    def end(self, reason: str) -> None:
+        self.revoke(reason)
+        self.ended.set()
 
     def authed(self, header: str) -> bool:
         if self.token is None or self.expires_at is None:
@@ -208,8 +214,11 @@ def make_handler(ag: Agent):
             if route == "/info" and method == "GET":
                 return self._send(200, ag.info())
             if route == "/disconnect" and method == "POST":
-                self._body(route); self._send(200, {"ok": True})
-                return ag.end(f"disconnected by '{ag.controller}'")
+                self._body(route)
+                reason = f"disconnected by '{ag.controller}'"
+                ag.revoke(reason)  # access is gone before the controller is told so
+                self._send(200, {"ok": True})
+                return ag.end(reason)
             if route == "/fs/list" and method == "GET":
                 return self._send(200, {"entries": ag._fs().list(q.get("path", "."))})
             if route == "/fs/read" and method == "GET":
@@ -269,6 +278,13 @@ def serve(ag: Agent, bind: str, port: int):
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     class Quiet(ThreadingHTTPServer):
+        allow_reuse_address = os.name != "nt"  # on Windows SO_REUSEADDR lets another process share the port
+
+        def server_bind(self):
+            if os.name == "nt":
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            super().server_bind()
+
         def handle_error(self, request, client_address):  # aborted/pin-rejected handshakes are expected, not errors
             pass
 

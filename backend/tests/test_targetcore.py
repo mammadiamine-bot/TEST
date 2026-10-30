@@ -128,3 +128,19 @@ def test_redaction_and_env():
 def test_detect_tools_shape():
     d = detect_tools(["git", "node"])
     assert set(d) == {"git", "node"} and all("found" in v for v in d.values())
+
+
+def _fake_run(rc, out="", err=""):
+    import subprocess as sp
+    return lambda *a, **k: sp.CompletedProcess(a[0], rc, out, err)
+
+
+def test_detect_python_rejects_store_alias(monkeypatch):
+    from app import targetcore as tc
+    monkeypatch.setattr(tc.shutil, "which", lambda n, **k: r"C:\Users\x\AppData\Local\Microsoft\WindowsApps\python.exe")
+    monkeypatch.setattr(tc.subprocess, "run", _fake_run(9009, err="Python was not found; run without arguments to install from the Microsoft Store"))
+    d = tc.detect_tools(["python"])["python"]
+    assert d["found"] is False and d["version"] is None and "Store" in d["note"]
+    monkeypatch.setattr(tc.subprocess, "run", _fake_run(0, out="Python 3.12.8"))
+    d = tc.detect_tools(["python"])["python"]
+    assert d["found"] is True and d["version"] == "Python 3.12.8"
