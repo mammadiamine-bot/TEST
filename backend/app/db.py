@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, org_id TEXT NOT NU
 CREATE TABLE IF NOT EXISTS scripts(id TEXT PRIMARY KEY, org_id TEXT, name TEXT NOT NULL, shell TEXT NOT NULL, risk TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS script_versions(script_id TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, sha256 TEXT NOT NULL, author TEXT NOT NULL, created_at REAL NOT NULL, PRIMARY KEY(script_id, version));
 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, shell TEXT NOT NULL, body TEXT NOT NULL, risk TEXT NOT NULL, script_id TEXT, script_version INTEGER, status TEXT NOT NULL, approval TEXT NOT NULL DEFAULT 'not_required', approved_by TEXT, created_by TEXT NOT NULL, created_at REAL NOT NULL, retries INTEGER NOT NULL DEFAULT 0, timeout INTEGER NOT NULL DEFAULT 300, schedule_id TEXT);
-CREATE TABLE IF NOT EXISTS job_runs(id TEXT PRIMARY KEY, job_id TEXT NOT NULL, worker_id TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, exit_code INTEGER, output TEXT DEFAULT '', started_at REAL, finished_at REAL, error TEXT);
+CREATE TABLE IF NOT EXISTS job_runs(id TEXT PRIMARY KEY, job_id TEXT NOT NULL, worker_id TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, remote TEXT, exit_code INTEGER, output TEXT DEFAULT '', started_at REAL, finished_at REAL, error TEXT);
 CREATE INDEX IF NOT EXISTS job_runs_w ON job_runs(worker_id, started_at);
 CREATE TABLE IF NOT EXISTS schedules(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, shell TEXT NOT NULL, body TEXT NOT NULL, risk TEXT NOT NULL, targets TEXT NOT NULL, every_minutes INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, next_run REAL NOT NULL, last_run REAL, created_by TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS subscriptions(org_id TEXT PRIMARY KEY, plan TEXT NOT NULL, status TEXT NOT NULL, trial_ends REAL, period_start REAL NOT NULL, period_end REAL NOT NULL, updated_at REAL NOT NULL);
@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS subscription_history(id INTEGER PRIMARY KEY AUTOINCRE
 CREATE TABLE IF NOT EXISTS usage(org_id TEXT NOT NULL, day TEXT NOT NULL, devices INTEGER NOT NULL, jobs INTEGER NOT NULL DEFAULT 0, ai_tokens INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(org_id, day));
 CREATE TABLE IF NOT EXISTS tickets(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, alert_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal', status TEXT NOT NULL DEFAULT 'open', created_by TEXT NOT NULL, created_at REAL NOT NULL, due_at REAL, resolved_at REAL);
 CREATE TABLE IF NOT EXISTS ai_runs(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, actor TEXT NOT NULL, request TEXT NOT NULL, engine TEXT NOT NULL, model TEXT, plan TEXT, answer TEXT, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, status TEXT NOT NULL, ts REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS inventory(worker_id TEXT NOT NULL, kind TEXT NOT NULL, ts REAL NOT NULL, data TEXT NOT NULL, PRIMARY KEY(worker_id, kind));
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 

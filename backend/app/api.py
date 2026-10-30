@@ -265,4 +265,9 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     workers.listeners.append(monitor.on_poll)
     app.state.monitor = monitor
     app.include_router(build_monitor_router(core, monitor))
+    from .api6 import build_router as build_ops_router
+    from .ops import Ops
+    ops = Ops(core.db, workers.call)
+    app.state.ops = ops
+    app.include_router(build_ops_router(core, ops, lambda org, feature: None))
     return app
