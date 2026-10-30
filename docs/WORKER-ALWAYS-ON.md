@@ -48,3 +48,11 @@ Claude Code runs (no Claude task is created by any of the above) · Windows repa
 
 ## What a green run proves
 See `docs/LAN-TEST-REPORT-*.md` for the dated evidence. Anything not listed there as PASS is not verified.
+
+## 3b. What was actually installed on the test Worker (2026-10-30)
+`service install` (scheduled task, section 3) was tried first and failed with `Access is denied`: Windows only lets an elevated administrator create a
+logon-triggered task, and the Worker deliberately runs unelevated (UAC is not bypassed). The equivalent **no-admin** mechanism was used instead:
+a launcher in that user's Startup folder, `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Claude IT Technician Worker.cmd`
+(`start "CIT Worker" /min "C:\CITWork\worker\cit-worker.exe" --data-dir "C:\CITWork\worker\data" run --bind <LAN IP> --port 8777`).
+It starts when that Windows user logs on (so the PC must reach the desktop; auto-logon is NOT configured and is not something this project changes),
+shows a minimized visible window, stores no password, and is disabled by deleting that one file. Stopping/revoking still works (`lock-worker.bat`, STOP file).
