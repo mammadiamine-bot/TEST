@@ -24,6 +24,31 @@ tested = automated tests pass · untested = code exists, never run against the r
 | UI: 14 sections (all M1 pages still reachable as tabs), AR/EN + RTL, task view with approvals/live log/diff | **tested** | `e2e/universal.js`: real browser + real backend + real agent process + test-double Claude; found and fixed a real bug (API rejected the agent's 8-digit code) |
 | Windows installer | **untested** | CI built the NSIS installer green (M1); never installed or run |
 
+
+## M3 — Dedicated AI Worker Station (added on top of M1/M2; nothing removed)
+Main laptop → pinned-TLS connection (Tailscale/LAN) → **Worker PC** (`worker/cit_worker.py`) → per-client workspaces/projects/approved systems.
+| Requirement | Status | Evidence / caveat |
+|---|---|---|
+| Worker registration, enrollment code shown on the worker, credential revocable, optional expiry, several workers | **tested** | enrollment rules, single use, 5-attempt cancel, revoke (credential and `revoke-all`) |
+| Online/offline, CPU/RAM/disk, active tasks, queue counts in the dashboard | **tested** (Linux) | psutil; Windows readings untested |
+| Assign worker to client/project (clients with own workspace, approved systems, authorization days) | **tested** | |
+| Claude Code on the worker, per-client sessions, streaming logs, reconnect-and-replay, cancel, emergency stop | **tested machinery**; real Claude **untested** | fake `claude` double; each client gets its own `CLAUDE_CONFIG_DIR` and its own `ANTHROPIC_API_KEY` secret; the owner's key is scrubbed |
+| Keeps running approved tasks when the laptop is gone | **tested** | |
+| Automatic reconnection after network interruption | **tested** | GETs retried with backoff; POSTs never blindly retried; a different certificate on the same address is refused |
+| Durable queue: pending/running/completed/failed/paused/cancelled/interrupted/needs_review | **tested** | one running task per project; global parallelism configurable |
+| Safe resume; never repeat destructive actions | **tested** | real SIGKILL test: a destructive `command` that was running becomes `needs_review`, is NOT re-run, orphan process is killed; only `retry` with a new approval can run it again; `auto_resume` is opt-in and only for non-destructive Claude tasks with a saved session |
+| Production approval | **tested** | deploy is always production: typed "Client name/project" |
+| Automatic checkpoints + restore | **tested** | tar.gz snapshot before Claude/destructive steps (100 MB cap, refuses to run without one) |
+| Client-site mode: approved systems only, no scanning, visible identity/status, revoke, remove | **tested** | `system-check` refuses anything not on the client's list; STOP file; authorization window locks the worker when it ends; `wipe --name` overwrites secrets then deletes |
+| Network isolation / firewall | **untested** | generates a Windows Firewall script (private ranges minus approved systems/gateway/DNS) — never applied; app-level policy only until you run it |
+| Terminal / files / git / build / test / deploy per client | **tested** | Docker availability is only detected, no Docker-specific actions yet |
+| Tailscale / SSH / RustDesk | Tailscale **untested**; RustDesk launch **untested**; SSH **planned** for the worker | worker API listens only for private/Tailscale sources and is meant to be bound to the 100.x address |
+| Secrets in OS-backed storage | **untested** on Windows | DPAPI via `windows_check.py` in CI; elsewhere the worker REFUSES to store secrets unless started with `--dev-insecure-store` (reported as "NOT OS-backed") |
+| Visible, explicit persistence | **untested** | `service install --user X --i-understand` creates one named scheduled task; `service remove` deletes it; no hidden persistence |
+| Dashboard section "AI Worker Stations" (overview, add wizard, clients/projects, queue, live log, terminal, remote desktop, security) | **tested** | browser e2e `e2e/worker.js` |
+
+Limits to remember: (1) client isolation is enforced by the worker's code (separate folders, env, secrets); a malicious *project* running as the same Windows user could still read other clients' folders — for hostile clients use separate Windows accounts or separate Workers. (2) Claude Code's own network/file access is not sandboxed by this app; the firewall script and a dedicated Windows account are the real controls. (3) The controller's token for a worker is persisted only where DPAPI exists; elsewhere you re-enroll after restarting the app.
+
 ## Known gaps / blocked (honest list)
 - **Real Claude never exercised**: the flag set (`-p --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools …`) is from documentation knowledge; first run on a real login may need adjustments. Central-mode isolation between clients relies on a per-device/per-project working directory + restricted tools, not an OS sandbox.
 - Prompt-injection risk: project files can contain text aimed at Claude. Mitigations: file-edit-only tools by default (Bash off), approvals before anything is pushed, backups, verification. Not eliminated.

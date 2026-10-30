@@ -49,7 +49,7 @@ class Workers:
 
     def view(self, r: dict) -> dict:
         st = self.state.get(r["id"], {})
-        return {**r, "online": st.get("online", False), "resources": st.get("status"), "token_loaded": r["id"] in self.clients and bool(self.clients[r["id"]].token)}
+        return {**r, "online": st.get("online", False), "resources": st.get("status"), "credential_loaded": r["id"] in self.clients and bool(self.clients[r["id"]].token)}
 
     def get(self, wid: str) -> dict:
         r = self.db.one("SELECT * FROM workers WHERE id=?", (wid,))

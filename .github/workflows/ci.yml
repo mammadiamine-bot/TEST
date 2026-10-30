@@ -10,6 +10,7 @@ jobs:
       - run: pip install -r backend/requirements-dev.txt
       - run: cd backend && python -m pytest -q
       - run: python agent/cit_agent.py --selftest
+      - run: python worker/cit_worker.py selftest
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -56,3 +57,16 @@ jobs:
           mkdir -p portable && cp dist/cit-agent.exe agent/portable/start-agent.bat agent/portable/README-USB.txt portable/
       - uses: actions/upload-artifact@v4
         with: { name: cit-agent-portable, path: portable/* }
+  worker-windows:  # builds the Worker Station and runs its selftest on a real Windows runner (DPAPI path is NOT covered by the selftest)
+    needs: [backend]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r backend/requirements.txt pyinstaller
+      - run: pyinstaller --onefile --name cit-worker -p backend worker/cit_worker.py
+      - name: Windows-only checks (DPAPI round trip, enroll, restart keeps identity)
+        run: python worker/windows_check.py dist\cit-worker.exe
+      - uses: actions/upload-artifact@v4
+        with: { name: cit-worker, path: dist/cit-worker.exe }

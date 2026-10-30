@@ -30,6 +30,17 @@ FEATURES = [
     ("sec.dpapi", "Security", "Windows DPAPI credential storage", "untested", "Refuses to store secrets off Windows (tested)"),
     ("pkg.installer", "Packaging", "Tauri NSIS installer", "untested", "Built green in CI; never installed or run"),
     ("pkg.signing", "Packaging", "Code signing", "blocked", "Needs a code-signing certificate"),
+    ("worker.core", "Worker Station", "Persistent worker service: pinned-TLS identity, enrollment code, revocable credentials, authorization window, lock/STOP file/emergency stop", "tested", "26 worker tests incl. real process SIGKILL + restart"),
+    ("worker.isolation", "Worker Station", "Per-client workspace, secrets, Claude config dir; no cross-client file/env access; approved-systems-only network checks", "tested", "Linux; DPAPI path untested"),
+    ("worker.queue", "Worker Station", "Durable task queue: approval, production confirmation, checkpoints, pause/resume (Claude session), cancel, crash recovery that never re-runs destructive work", "tested", "with the fake `claude` double"),
+    ("worker.autonomy", "Worker Station", "Approved tasks keep running when the laptop disconnects; history replayable on reconnect", "tested", "loopback"),
+    ("worker.reconnect", "Worker Station", "Online/offline monitor, GET retries with backoff, automatic reconnection, identity-mismatch refusal", "tested", "loopback; real Tailscale flaps untested"),
+    ("worker.dpapi", "Worker Station", "Secrets + TLS key protected by Windows DPAPI", "untested", "CI step windows_check.py runs it on a Windows runner — check the result"),
+    ("worker.windows", "Worker Station", "Worker .exe on Windows + scheduled-task install (`service install --i-understand`)", "untested", "Command strings tested; never run on Windows"),
+    ("worker.firewall", "Worker Station", "Generated Windows Firewall script isolating the client's LAN", "untested", "CIDR maths tested; script never applied"),
+    ("worker.tailscale", "Worker Station", "Reaching the worker over Tailscale (bind to 100.x)", "untested", "Needs a real tailnet"),
+    ("worker.ssh", "Worker Station", "SSH to the worker as a second command channel", "planned", "The pinned-TLS worker API is the control channel today"),
+    ("worker.remote_claude", "Worker Station", "Claude Code on the worker with each client's own key", "untested", "Needs real Claude + a client key"),
     ("ui.i18n", "UI", "Arabic/English with RTL", "tested", "Navigation + main actions; some long texts still English"),
 ]
 

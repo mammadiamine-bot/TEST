@@ -55,7 +55,9 @@ def test_enroll_flow_status_and_resources(ctrl):
     w = ctrl.c.post(f"/workers/{wid}/enroll", json={"code": ctrl.w.new_enroll_code()}).json()
     assert w["status"] == "online" and w["online"] and w["token_persisted"] and 0 <= w["resources"]["cpu"] <= 100
     assert "tools" in ctrl.c.get(f"/workers/{wid}/w/status").json()
-    assert "token" not in str(ctrl.c.get("/workers").json()) and "token" not in str(ctrl.core.audit_log())
+    tok = ctrl.app.state.workers.clients[wid].token
+    assert tok and tok not in str(ctrl.c.get("/workers").json()) and tok not in str(ctrl.core.audit_log())  # the credential VALUE is never exposed or logged
+    assert tok not in str(ctrl.w.store.all("SELECT * FROM audit"))
 
 
 def test_proxy_allowlist_and_audit_never_logs_secret_values(ctrl):

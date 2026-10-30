@@ -3,6 +3,7 @@ import { api } from "./api";
 import { setLang, t, useLang } from "./i18n";
 import * as P from "./pages";
 import * as Q from "./pages2";
+import { Workers } from "./pages3";
 
 type Page = (p: { c: P.Ctx }) => JSX.Element;
 const Tabs = ({ c, tabs }: { c: P.Ctx; tabs: [string, Page][] }) => {
@@ -15,7 +16,7 @@ const Overview: Page = ({ c }) => <><P.Overview c={c} /></>;
 
 // The 14 primary sections. Every page from the first milestone is still reachable inside them.
 const SECTIONS: [string, Page][] = [
-  ["overview", Overview], ["devices", tabbed([["inventory", P.Inventory], ["discovery", P.Discovery]])], ["quick", Q.QuickConnect],
+  ["overview", Overview], ["workers", Workers], ["devices", tabbed([["inventory", P.Inventory], ["discovery", P.Discovery]])], ["quick", Q.QuickConnect],
   ["workspace", Q.Workspace], ["projects", Q.Projects], ["rclaude", Q.RemoteClaude], ["servers", Q.Servers], ["desktop", Q.Desktop], ["files", Q.Files],
   ["fixes", tabbed([["diagnostics", P.Diagnostics], ["repairs", P.Repairs], ["metrics", P.Metrics], ["chat", P.Chat], ["console", P.Console], ["software", P.Software], ["hardware", P.Hardware], ["logs", P.Logs]])],
   ["deployments", Q.Deployments], ["history", Q.History], ["reports", tabbed([["reports", P.Reports], ["audit", P.Audit]])], ["settings", Settings],
