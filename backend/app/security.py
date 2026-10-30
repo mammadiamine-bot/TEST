@@ -5,11 +5,10 @@ import hmac
 from fastapi import Header, HTTPException, Request
 
 
-def require_token(request: Request, authorization: str = Header(default="")) -> None:
-    expected = request.app.state.settings.api_token
-    scheme, _, supplied = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied.encode(), expected.encode()):
-        raise HTTPException(401, "invalid or missing API token")
+def require_token(request: Request) -> None:
+    """Authenticate (built-in owner token or a scoped principal's token) and enforce role + organization scope. See tenancy.py."""
+    from .tenancy import authorize
+    authorize(request)
 
 
 from .protect import DpapiProtector, SecretProtector, UnavailableProtector, default_protector  # noqa: F401  (re-exported)

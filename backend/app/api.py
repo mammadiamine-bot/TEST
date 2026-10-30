@@ -255,4 +255,6 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     app.include_router(r)
     app.include_router(build_router(core, dev, tasks))
     app.include_router(build_workers_router(workers))
+    from .api4 import build_router as build_tenancy_router
+    app.include_router(build_tenancy_router(core, workers))
     return app

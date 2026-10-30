@@ -33,3 +33,26 @@ def assert_private_address(host: str) -> None:
     for ip in addrs:
         if not _ok(ip):
             raise NetworkPolicyError(f"{ip} is a public address; only LAN, link-local (Ethernet) or Tailscale targets are allowed")
+
+
+_OVERLAY = ipaddress.ip_network("100.64.0.0/10")
+
+
+def classify_path(host: str) -> str:
+    """How traffic to this host travels: loopback | lan | link-local | overlay (Tailscale/WireGuard) | blocked. Resolves names (e.g. MagicDNS)."""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        try:
+            ip = ipaddress.ip_address(socket.getaddrinfo(host, None)[0][4][0])
+        except (OSError, IndexError):
+            return "unresolvable"
+    if not _ok(ip):
+        return "blocked"
+    if ip.is_loopback:
+        return "loopback"
+    if ip.version == 4 and ip in _OVERLAY:
+        return "overlay"
+    if ip.is_link_local:
+        return "link-local"
+    return "lan"

@@ -42,7 +42,17 @@ CREATE TABLE IF NOT EXISTS workers(
 CREATE TABLE IF NOT EXISTS audit(
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL,
   device_id TEXT, detail TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS orgs(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS sites(
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT NOT NULL, notes TEXT, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS principals(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, org_ids TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+  created_at REAL NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, last_used REAL);
 """
+
+# additive, idempotent migrations for databases created before multi-client support (existing rows keep org_id NULL = unassigned)
+MIGRATIONS = [("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 
 def new_id(prefix: str) -> str:
@@ -58,6 +68,10 @@ class Db:
         self.lock = threading.RLock()
         with self.lock:
             self.conn.executescript(SCHEMA)
+            for table, col, typ in MIGRATIONS:
+                if col not in {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+            self.conn.commit()
 
     def execute(self, sql: str, args: tuple = ()) -> sqlite3.Cursor:
         with self.lock:
