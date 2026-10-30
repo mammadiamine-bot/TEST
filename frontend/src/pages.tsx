@@ -95,11 +95,17 @@ export function Discovery({ c }: PP) {
 }
 
 export function Inventory({ c }: PP) {
-  const { go, err } = useAsync();
-  return <div className="card"><Err m={err} /><table><thead><tr><th>Name</th><th>Address</th><th>Transport</th><th>Owner</th><th>Status</th><th></th></tr></thead>
-    <tbody>{c.devices.map(d => <tr key={d.id}><td>{d.name}</td><td>{d.address}</td><td>{d.transport}</td><td>{d.owner_name}</td><td>{d.status}</td>
-      <td className="row"><button className="btn ghost" onClick={() => c.select(d.id)}>Select</button>
-        {d.status !== "revoked" && <button className="btn danger" onClick={() => go(async () => { await api(`/devices/${d.id}/revoke`, "POST"); c.refresh(); })}>{t("revoke")}</button>}</td></tr>)}</tbody></table></div>;
+  const { go, err, busy } = useAsync(); const [det, setDet] = useState<any>(null); const [test, setTest] = useState<any>(null);
+  const show = (id: string) => go(async () => { setDet(null); setTest(null); setTest(await api(`/devices/${id}/connection-test`)); try { setDet(await api(`/devices/${id}/info`)); } catch (e: any) { setDet({ error: e.message }); } });
+  return <><div className="card"><Err m={err} /><table><thead><tr><th>Name</th><th>Address</th><th>Transport</th><th>Owner</th><th>Status</th><th></th></tr></thead>
+    <tbody>{c.devices.map(d => <tr key={d.id}><td>{d.name}</td><td dir="ltr">{d.address}</td><td>{d.transport}</td><td>{d.owner_name}</td><td>{d.status}{d.transport === "agent" ? (d.live ? " · live" : " · not connected") : ""}</td>
+      <td className="row"><button className="btn ghost" onClick={() => c.select(d.id)}>Select</button><button className="btn ghost" disabled={busy} onClick={() => show(d.id)}>Details / test</button>
+        {d.status !== "revoked" && d.transport !== "local" && <button className="btn danger" onClick={() => go(async () => { await api(`/devices/${d.id}/revoke`, "POST"); c.refresh(); })}>{t("revoke")}</button>}</td></tr>)}</tbody></table></div>
+    {test && <div className="card mt"><h3>Connection test (real requests)</h3><table><tbody>{test.checks.map((k: any) => <tr key={k.stage}><td>{k.ok ? "✔" : "✖"} {k.stage}</td><td>{k.detail}{k.hint && <div className="tag">→ {k.hint}</div>}</td></tr>)}</tbody></table></div>}
+    {det?.info && <div className="card mt"><h3>Facts read from the machine itself</h3><div>{det.info.host} · {det.info.os}</div><div className="tag">allowed by the owner: {(det.info.grants || []).join(", ") || "read-only diagnostics"}</div>
+      <div className="tag" dir="ltr">project folders: {(det.info.roots || []).join(" ; ") || "none"}</div><div className="tag">{Object.entries(det.info.tools || {}).map(([k, v]: any) => `${k}${v.found ? " " + (v.version ?? "✔") : " ✖"}`).join(" · ")}</div>
+      {det.sessions?.[0] && <div className="tag">session: {det.sessions[0].status}, scope {det.sessions[0].scope}{det.sessions[0].expires_at ? `, expires ${new Date(det.sessions[0].expires_at * 1000).toLocaleTimeString()}` : ""}</div>}</div>}
+    {det?.error && <div className="err">{det.error}</div>}</>;
 }
 
 // ------------------------------------------------------------------ Live metrics

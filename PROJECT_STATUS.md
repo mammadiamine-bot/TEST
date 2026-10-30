@@ -49,6 +49,16 @@ Main laptop → pinned-TLS connection (Tailscale/LAN) → **Worker PC** (`worker
 
 Limits to remember: (1) client isolation is enforced by the worker's code (separate folders, env, secrets); a malicious *project* running as the same Windows user could still read other clients' folders — for hostile clients use separate Windows accounts or separate Workers. (2) Claude Code's own network/file access is not sandboxed by this app; the firewall script and a dedicated Windows account are the real controls. (3) The controller's token for a worker is persisted only where DPAPI exists; elsewhere you re-enroll after restarting the app.
 
+## M4 — first real LAN test (main PC + second PC on the same Wi-Fi)
+**Status: NOT PERFORMED.** No computer was connected to the assistant's session (`list_computer_folders` returned nothing) and it runs in a Linux cloud container, so it could not see the USB drive, this PC's network, or the second PC. Nothing was simulated.
+What was built so you can do it and get real evidence:
+- `tools/prepare-usb.ps1` — read-only network/USB listing, copy to `<drive>:\CITAgent` only after you type YES, never formats/deletes/overwrites, SHA-256 verified. **untested on Windows**; a static test forbids destructive commands.
+- Agent banner now prints the PC's own LAN addresses (so no scanning is ever needed to find it). `probe` accepts the port you typed.
+- `tools/lan_check.py` — the real end-to-end verifier (pair, connection test, remote exec, 200 KB file round trip with SHA-256, hello.py coding task, optional remote Claude with live log, real reconnect, disconnect). Proven against a real backend + real agent over **loopback only** (3 tests: all-pass, BLOCKED-not-success when the owner denied permissions, honest FAIL on a wrong fingerprint).
+- Dashboard: *Devices → Details / test* shows the machine's own host/OS/tools/permissions and the staged connection test (backend `GET /devices/{id}/info`).
+- `docs/LAN-TEST-RUNBOOK.md` — numbered steps, who does what, where your approval is required (firewall prompt, installs, Claude sign-in with a separate account).
+**Still unverified until you run it:** every Windows-side behaviour of the above, real Wi-Fi reachability (router client isolation?), Claude Code on the second PC.
+
 ## Known gaps / blocked (honest list)
 - **Real Claude never exercised**: the flag set (`-p --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools …`) is from documentation knowledge; first run on a real login may need adjustments. Central-mode isolation between clients relies on a per-device/per-project working directory + restricted tools, not an OS sandbox.
 - Prompt-injection risk: project files can contain text aimed at Claude. Mitigations: file-edit-only tools by default (Bash off), approvals before anything is pushed, backups, verification. Not eliminated.

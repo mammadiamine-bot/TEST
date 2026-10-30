@@ -13,6 +13,7 @@ import json
 import os
 import secrets
 import shutil
+import socket
 import ssl
 import subprocess
 import sys
@@ -278,6 +279,25 @@ def serve(ag: Agent, bind: str, port: int):
     return srv, fp
 
 
+def private_addresses() -> list[str]:
+    """This computer's own LAN addresses, shown on its screen so nobody has to scan the network to find it."""
+    found: list[str] = []
+    try:
+        import psutil
+        for name, addrs in psutil.net_if_addrs().items():
+            for a in addrs:
+                if a.family == socket.AF_INET and _private_ip(ipaddress.ip_address(a.address)) and not a.address.startswith("127."):
+                    found.append(f"{a.address} ({name})")
+    except ImportError:
+        try:
+            for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+                if _private_ip(ipaddress.ip_address(ip)) and not ip.startswith("127."):
+                    found.append(ip)
+        except OSError:
+            pass
+    return found
+
+
 def watchdog(ag: Agent):
     while not ag.ended.wait(1):
         if ag.expires_at and time.time() > ag.expires_at:
@@ -348,6 +368,7 @@ def main(argv=None) -> int:
     srv, fp = serve(ag, a.bind, a.port)
     spaced = " ".join(fp[i:i + 8] for i in range(0, len(fp), 8)).upper()
     print(f"\n=== Claude IT Technician agent {VERSION} ===\n"
+          f"Computer:     {socket.gethostname()}\nAddresses:    {', '.join(private_addresses()) or '(none found: check Wi-Fi)'}\n"
           f"Port:         {a.port}\nPairing code: {ag.code}   (valid 10 min, single use)\nFingerprint:  {spaced}\n"
           f"Allowed:      read-only diagnostics" + "".join(f", {n}" for n in ag.grants.names()) +
           f"\nProject dirs: {', '.join(a.root) or '(none)'}\nSession:      {a.minutes} min after pairing\n"
