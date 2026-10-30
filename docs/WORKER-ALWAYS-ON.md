@@ -10,7 +10,7 @@ automatic reconnect from the controller (GET retried with backoff; a different c
 Unlimited time never means unlimited privileges: access stays per-client/per-project, Claude Code is never started unless you create a Claude task, and nothing is exposed beyond private/Tailscale source addresses.
 
 ## 1. Copy to the Worker's internal disk (no install, no admin)
-On the Worker: create `C:\CITWorker`, copy `cit-worker.exe` from the USB folder `CITWorker`, compare the SHA-256 printed by `prepare` on the main PC
+On the Worker: create `C:\CITWorker`, copy `cit-worker.exe` from the USB folder `CITWorker`, compare its SHA-256 with the one recorded on the main PC
 (`Get-FileHash C:\CITWorker\cit-worker.exe`). After this the USB is not needed.
 Keep **all state in one folder you can delete**: `C:\CITWorker\data` (identity, DPAPI-protected key, database, per-client workspaces).
 `C:\CITWork` (the old agent folder) is not touched. The Worker keeps each client's files in `C:\CITWorker\data\workspaces\<client>`.
@@ -27,7 +27,7 @@ Check the banner says `Secret store: OS-backed` (DPAPI). If it says NOT OS-backe
 
 ## 3. Start automatically after login (needs your approval; reversible)
 ```
-cit-worker.exe --data-dir C:\CITWorker\data service install --user <WindowsAccount> --i-understand
+cit-worker.exe --data-dir C:\CITWorker\data service install --user <WindowsAccount> --bind <this PC's LAN IP> --port 8777 --i-understand
 cit-worker.exe --data-dir C:\CITWorker\data service show
 cit-worker.exe --data-dir C:\CITWorker\data service remove      :: undo
 ```
@@ -37,7 +37,7 @@ It runs in that user's session, so DPAPI keeps working. Duplicate instances are 
 ## 4. Control, health and revocation
 | Need | How |
 |---|---|
-| Status | `cit-worker.exe --data-dir C:\CITWorker\data status`, dashboard *AI Worker Stations* (online / offline / stale + CPU, RAM, disk) |
+| Status | `cit-worker.exe --data-dir C:\CITWorker\data status`, dashboard *AI Worker Stations* (API field `state`: online / reconnecting / offline / needs_pairing, plus CPU, RAM, disk; the on-screen label for `state` is not yet verified) |
 | Stop everything now | create a file named `STOP` in `C:\CITWorker\data`, or `lock` |
 | Revoke the main PC | `revoke-all` (the main PC must enroll again with a new code) |
 | Expire access automatically | `authorize --days N` (default: none) |
