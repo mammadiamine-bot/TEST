@@ -25,7 +25,7 @@ Linux cloud container. Python 3.13, Node 22, Rust 1.97. **No Windows, no PowerSh
 - **Offline mode**: connectivity probe; diagnostics keep working; chat answers are labelled "scripted"; sanitized question + finding ids queued locally.
 - **UI**: dark-blue React/TS dashboard, 15 pages, AR/EN with RTL.
 - **Transports**: Mock (tested); OpenSSH and WinRM-HTTPS written but **untested**.
-- **Packaging files**: Tauri v2 shell (token handoff + sidecar), GitHub Actions CI incl. Windows installer job — **never executed**.
+- **Packaging files**: Tauri v2 shell + GitHub Actions CI. CI run 1: backend and frontend jobs green on GitHub; the Windows job built the PyInstaller sidecar, then failed in `tauri build` (CLI run from the wrong directory) — fixed in follow-up, installer still unverified.
 
 ## Untested / unverified
 - All PowerShell scripts (syntax, output shape, behaviour on Windows 10/11, elevation needs).
