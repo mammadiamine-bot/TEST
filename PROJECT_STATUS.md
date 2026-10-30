@@ -10,7 +10,7 @@ tested = automated tests pass · untested = code exists, never run against the r
 | Area | Status | Evidence / caveat |
 |---|---|---|
 | Portable agent `agent/cit_agent.py` (TLS cert pinning, 8-digit single-use code, 5-attempt lockout, per-owner grants: terminal/write/repair/claude, session expiry, `d`+Enter / Ctrl+C disconnect, temp cert files deleted, refuses public source IPs, unknown JSON fields rejected so no credential field can exist) | **tested** | 16 loopback tests + `--selftest` (also run in CI on Linux and on a Windows runner) |
-| Agent as a Windows `.exe` + USB folder (`start-agent.bat`, README) | **untested** | CI job `agent-windows` builds it and runs `--selftest`; check the Actions result. Windows never auto-runs USB programs, so the client starts it |
+| Agent as a Windows `.exe` + USB folder (`start-agent.bat`, README) | `.exe` build + `--selftest` **passed on a Windows CI runner**; `start-agent.bat` and USB use **untested** | loopback only. Windows never auto-runs USB programs, so the client starts it |
 | Targets: one API for agent, this computer, Linux SSH servers; confined filesystem (symlink-safe), argv-only exec, scrubbed env, capped output, cancel/timeout | **tested** | agent + local; SSH via a fake `ssh` that executes the remote string through `sh` (proves quoting) |
 | Existing Windows diagnostics/repairs now also run through the agent | **untested** on Windows | routed + grant-checked in tests with an injected PowerShell runner |
 | Dev workspace: projects, explorer, editor (keeps previous version on every save), git status/diff, build/test, restricted terminal, backup/rollback, environment info | **tested** | agent + local targets |

@@ -8,7 +8,7 @@ FEATURES = [
     ("diag.mock", "Diagnostics", "13 diagnostic modules + verified repairs on mock devices", "mock", "Rules tested; PowerShell scripts never run on real Windows"),
     ("diag.powershell", "Diagnostics", "PowerShell diagnostics/repairs on real Windows", "untested", "Needs a Windows test PC"),
     ("agent.core", "Agent", "Portable agent: TLS pinning, pairing code, grants, expiry, disconnect, confinement", "tested", "Loopback tests on Linux + CI selftest"),
-    ("agent.windows", "Agent", "Agent .exe on Windows (PyInstaller build + --selftest in CI)", "untested", "CI job added; check Actions for result"),
+    ("agent.windows", "Agent", "Agent .exe on Windows (PyInstaller build + --selftest)", "tested", "Passed on a GitHub windows-latest runner (loopback only; PowerShell tools and a real LAN are still untested)"),
     ("agent.usb", "Agent", "Run from USB drive (start-agent.bat)", "untested", "Windows does not auto-run USB programs by design"),
     ("agent.persistent", "Agent", "Persistent installed mode", "planned", "Only when explicitly requested; not built"),
     ("agent.gui", "Agent", "Graphical status window", "planned", "Console window is the visible indicator today"),
