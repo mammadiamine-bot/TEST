@@ -13,6 +13,7 @@ from . import tools as toolmod
 from .config import Settings
 from .security import require_token
 from .service import Core, CoreError
+from .targetcore import TargetError
 
 NAME = Field(min_length=1, max_length=120)
 
@@ -25,6 +26,8 @@ class DeviceIn(BaseModel):
     owner_contact: str = Field(min_length=3, max_length=200)
     authorization_note: str = Field(min_length=10, max_length=1000, description="How the owner authorized this support")
     scenario: str | None = None
+    kind: str = "workstation"
+    allow_public: bool = False
 
 
 class PairIn(BaseModel):
@@ -75,12 +78,21 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     core = core or Core(settings)
     app = FastAPI(title="Claude IT Technician API", version="0.1.0", docs_url=None, redoc_url=None)
     app.state.settings, app.state.core = settings, core
+    from .api2 import build_router
+    from .dev import Dev
+    from .tasks import Tasks
+    dev = Dev(core); tasks = Tasks(core, dev)
+    app.state.dev, app.state.tasks = dev, tasks
 
     app.add_middleware(CORSMiddleware, allow_origins=["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420", "http://127.0.0.1:1420"],
                        allow_methods=["*"], allow_headers=["Authorization", "Content-Type"])
 
     @app.exception_handler(CoreError)
     async def _core_err(_: Request, e: CoreError):
+        return JSONResponse({"detail": str(e)}, status_code=e.status)
+
+    @app.exception_handler(TargetError)
+    async def _target_err(_: Request, e: TargetError):
         return JSONResponse({"detail": str(e)}, status_code=e.status)
 
     @app.exception_handler(toolmod.ToolError)
@@ -107,11 +119,13 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
 
     @r.get("/devices")
     def devices():
+        core.ensure_local_device()
         return core.devices()
 
     @r.post("/devices", status_code=201)
     def create_device(b: DeviceIn):
-        return core.create_device(b.name, b.address, b.transport, b.owner_name, b.owner_contact, b.authorization_note, b.scenario)
+        return core.create_device(b.name, b.address, b.transport, b.owner_name, b.owner_contact, b.authorization_note, b.scenario,
+                                  kind=b.kind, allow_public=b.allow_public)
 
     @r.get("/devices/{did}")
     def device(did: str):
@@ -236,4 +250,5 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
         return FileResponse(path, media_type="application/pdf", filename=path.name)
 
     app.include_router(r)
+    app.include_router(build_router(core, dev, tasks))
     return app
