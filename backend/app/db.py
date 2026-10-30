@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS projects(
 CREATE TABLE IF NOT EXISTS tasks(
   id TEXT PRIMARY KEY, device_id TEXT NOT NULL, project_id TEXT, kind TEXT NOT NULL, status TEXT NOT NULL,
   created_at REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS workers(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, address TEXT NOT NULL, fingerprint TEXT NOT NULL, worker_id TEXT, credential_id TEXT,
+  status TEXT NOT NULL, rustdesk_id TEXT, notes TEXT, created_at REAL NOT NULL, last_seen REAL);
 CREATE TABLE IF NOT EXISTS audit(
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL,
   device_id TEXT, detail TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);

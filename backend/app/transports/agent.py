@@ -18,6 +18,10 @@ def norm_fp(fp: str) -> str:
     return fp.replace(":", "").replace(" ", "").replace("-", "").lower()
 
 
+class IdentityMismatch(TransportError):
+    """The peer presented a different certificate than the one the owner confirmed. Never retried."""
+
+
 class _Pinned(http.client.HTTPSConnection):
     def __init__(self, host, port, fp, timeout):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -32,7 +36,7 @@ class _Pinned(http.client.HTTPSConnection):
         der = self.sock.getpeercert(binary_form=True)
         if not der or hashlib.sha256(der).hexdigest() != self._fp:
             self.close()
-            raise TransportError("agent identity mismatch: certificate fingerprint differs from the one confirmed by the owner")
+            raise IdentityMismatch("agent identity mismatch: certificate fingerprint differs from the one confirmed by the owner")
 
 
 class AgentClient:
@@ -44,7 +48,19 @@ class AgentClient:
         self.grants: list[str] = []
 
     # --- transport plumbing
-    def _req(self, method: str, path: str, body: dict | None = None, auth: bool = True, timeout: int | None = None):
+    def _req(self, method: str, path: str, body: dict | None = None, auth: bool = True, timeout: int | None = None, retries: int = 0):
+        delay = 0.3
+        for attempt in range(retries + 1):
+            try:
+                return self._req_once(method, path, body, auth, timeout)
+            except IdentityMismatch:
+                raise
+            except TransportError:
+                if attempt == retries:
+                    raise
+                time.sleep(delay); delay *= 2  # exponential backoff for brief network interruptions
+
+    def _req_once(self, method: str, path: str, body: dict | None = None, auth: bool = True, timeout: int | None = None):
         c = _Pinned(self.host, self.port, self.fp, timeout or self.timeout)
         try:
             h = {"Content-Type": "application/json"}
@@ -120,3 +136,16 @@ class AgentClient:
         console_script(command)  # validate locally too
         d = self._req("POST", "/console", {"command": command}, timeout=timeout_s + 15)
         return Result(d["ok"], d["output"], d.get("error", ""))
+
+
+class WorkerClient(AgentClient):
+    """Controller side of a Worker Station. Idempotent reads are retried with backoff; writes are never retried blindly."""
+    kind = "worker"
+
+    def enroll(self, code: str, controller: str, days: float | None = None) -> dict:
+        d = self._req("POST", "/enroll", {"code": code, "controller": controller, **({"days": days} if days else {})}, auth=False)
+        self.token = d["token"]
+        return d
+
+    def call(self, method: str, path: str, body: dict | None = None):
+        return self._req(method, path, body, retries=3 if method == "GET" else 0)

@@ -41,33 +41,11 @@ CLAUDE_HELP = ("Remote Claude needs, on THE CLIENT's computer: (1) the agent sta
                "(task kind 'Install tools'), (3) the client logged into Claude Code with their OWN account or key. Your personal Claude login is never copied.")
 
 
-def clean(s: str) -> str:
-    return _KV.sub(lambda m: m.group(1) + "=<redacted>", _SECRET_VAL.sub("<redacted>", s))
+from .claudeutil import claude_event, clean  # noqa: E402,F401
 
 
 def _sha(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
-
-
-def claude_event(line: str) -> str | None:
-    """Condense one stream-json line from `claude -p --output-format stream-json` into a log line."""
-    try:
-        j = json.loads(line)
-    except json.JSONDecodeError:
-        return line[:300] if line.strip() else None
-    t = j.get("type")
-    if t == "assistant":
-        out = []
-        for b in (j.get("message") or {}).get("content", []):
-            if b.get("type") == "text" and b.get("text", "").strip():
-                out.append(b["text"].strip().replace("\n", " ")[:300])
-            elif b.get("type") == "tool_use":
-                inp = b.get("input") or {}
-                out.append(f"tool {b.get('name')}: {inp.get('file_path') or inp.get('pattern') or inp.get('command') or ''}"[:200])
-        return " | ".join(out) or None
-    if t == "result":
-        return f"result: {'ERROR ' if j.get('is_error') else ''}{str(j.get('result', ''))[:300]}" + (f" (cost ${j['total_cost_usd']:.4f})" if j.get("total_cost_usd") else "")
-    return None
 
 
 class Tasks:

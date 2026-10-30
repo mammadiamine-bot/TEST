@@ -23,6 +23,7 @@ from pathlib import Path
 MAX_FILE = 5 * 1024 * 1024
 MAX_OUTPUT = 5 * 1024 * 1024
 SECRET_ENV = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)", re.I)
+SKIP_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", "target", ".venv", "venv", ".next", ".gradle", ".idea", ".cit", ".claude-home"}
 PERMISSION_MODES = {"default", "acceptEdits", "plan"}  # never bypassPermissions
 
 
@@ -263,7 +264,7 @@ class JobManager:
         return n
 
 
-def claude_argv(prompt: str, permission_mode: str, allowed_tools: list[str]) -> list[str]:
+def claude_argv(prompt: str, permission_mode: str, allowed_tools: list[str], resume: str | None = None) -> list[str]:
     if permission_mode not in PERMISSION_MODES:
         raise TargetError(f"permission_mode must be one of {sorted(PERMISSION_MODES)}")
     if not prompt.strip() or len(prompt) > 20000:
@@ -273,6 +274,10 @@ def claude_argv(prompt: str, permission_mode: str, allowed_tools: list[str]) -> 
     argv = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", permission_mode]
     if allowed_tools:
         argv += ["--allowedTools", ",".join(allowed_tools)]
+    if resume:
+        if not re.fullmatch(r"[A-Za-z0-9-]{8,64}", resume):
+            raise TargetError("invalid session id")
+        argv += ["--resume", resume]
     return argv
 
 
