@@ -25,7 +25,6 @@ SERIAL = re.compile(r"^[A-Za-z0-9._:-]{4,64}$")
 PKG = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 KEYS = {"HOME": 3, "BACK": 4, "APP_SWITCH": 187, "POWER": 26, "VOLUME_UP": 24, "VOLUME_DOWN": 25, "ENTER": 66, "DEL": 67, "MENU": 82, "TAB": 61, "ESCAPE": 111, "DPAD_UP": 19, "DPAD_DOWN": 20, "DPAD_LEFT": 21, "DPAD_RIGHT": 22}
 SAFE_TEXT = re.compile(r"^[A-Za-z0-9 .,@_\-+=:/?!#%]{1,200}$")
-READ_CMDS = {"getprop", "dumpsys", "pm", "ls", "cat", "ps", "top", "df", "settings", "wm", "logcat", "uname", "date", "id", "uptime", "free", "getenforce", "ip", "netstat", "printenv"}
 META = re.compile(r"[;&|<>$`\\\n\r]")
 OUT_CAP = 200_000
 ADB_PATHS = (r"C:\Android-Testing\platform-tools\adb.exe", os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"))
@@ -35,24 +34,21 @@ def adb_exe() -> str | None:
     return shutil.which("adb") or next((p for p in ADB_PATHS if os.path.exists(p)), None)
 
 
+_SVC = r"(battery|meminfo|cpuinfo|wifi|connectivity|display|power|netstats|batterystats|usb|window|activity|diskstats|procstats|alarm|location|notification)"
+_PKGN = r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+"
+# every accepted command is matched as a WHOLE against one strict pattern; there are no free-form arguments, so no flag can change device state
+READ_ONLY = [re.compile(x) for x in (
+    r"getprop( [A-Za-z0-9._-]{1,80})?", rf"dumpsys {_SVC}", rf"dumpsys (meminfo|package) {_PKGN}",
+    r"pm list (packages|features|permissions)( -[3sfde])?( [A-Za-z0-9._]{1,80})?", rf"pm path {_PKGN}",
+    r"ls( -[lah]{1,4})?( /(sdcard|storage|proc|system|data/local/tmp)(/[A-Za-z0-9._-]+){0,6}/?)?", r"cat /(proc/(version|cpuinfo|meminfo|uptime|loadavg)|system/build\.prop)",
+    r"ps( -A| -e)?", r"top -n 1( -b)?", r"df( -h)?", r"settings get (global|secure|system) [A-Za-z0-9._]{1,60}", r"wm (size|density)",
+    r"uname( -a)?", r"date", r"id", r"uptime", r"free", r"getenforce", r"ip (addr|route|link)",
+)]
+
+
 def read_only_shell(cmd: str) -> bool:
     cmd = cmd.strip()
-    if not cmd or META.search(cmd) or len(cmd) > 300:
-        return False
-    parts = cmd.split()
-    if parts[0] not in READ_CMDS:
-        return False
-    if parts[0] == "pm" and (len(parts) < 2 or parts[1] not in ("list", "path", "dump")):
-        return False
-    if parts[0] == "settings" and (len(parts) < 2 or parts[1] != "get"):
-        return False
-    if parts[0] == "wm" and (len(parts) != 2 or parts[1] not in ("size", "density")):
-        return False
-    if parts[0] == "logcat" and "-c" in parts:
-        return False                                            # clearing the log changes evidence
-    if parts[0] == "top" and "-n" not in parts:
-        return False
-    return True
+    return bool(cmd) and len(cmd) <= 300 and not META.search(cmd) and ".." not in cmd and any(p.fullmatch(cmd) for p in READ_ONLY)
 
 
 WRAP = r'''$ErrorActionPreference='Stop'

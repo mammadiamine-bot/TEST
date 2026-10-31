@@ -44,3 +44,10 @@ export async function apiBlob(path: string): Promise<Blob> {
   if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail ?? d; } catch {} throw new ApiError(r.status, typeof d === "string" ? d : JSON.stringify(d)); }
   return r.blob();
 }
+
+/** POST and return the raw streaming Response (Server-Sent Events); throws ApiError on HTTP errors. Pass an AbortSignal to stop generation. */
+export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const r = await fetch(base + path, { method: "POST", signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail ?? d; } catch {} throw new ApiError(r.status, typeof d === "string" ? d : JSON.stringify(d)); }
+  return r;
+}

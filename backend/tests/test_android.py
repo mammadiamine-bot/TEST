@@ -96,9 +96,9 @@ def test_info_screen_and_touch_mapping(w):
 
 
 def test_read_only_shell_rules():
-    for ok in ("getprop ro.product.model", "dumpsys battery", "pm list packages -3", "ls /sdcard", "settings get global airplane_mode_on", "wm size", "top -n 1"):
+    for ok in ("getprop ro.product.model", "dumpsys battery", "pm list packages -3", "ls /sdcard", "settings get global airplane_mode_on", "wm size", "top -n 1", "dumpsys meminfo com.example.app", "ip addr", "cat /proc/meminfo"):
         assert read_only_shell(ok), ok
-    for bad in ("rm -rf /sdcard", "pm uninstall com.x", "reboot", "ls /sdcard; rm x", "cat /a | sh", "logcat -c", "settings put global x 1", "am start -a x", "top", "wm size 1x1", "echo $(id)"):
+    for bad in ("rm -rf /sdcard", "pm uninstall com.x", "reboot", "ls /sdcard; rm x", "cat /a | sh", "logcat -c", "settings put global x 1", "am start -a x", "top", "wm size 1x1", "echo $(id)", "dumpsys battery set level 5", "dumpsys battery reset", "dumpsys battery unplug", "logcat -d", "logcat -f /sdcard/x", "ls /sdcard/../data", "cat /data/system/users/0.xml", "ls -R /", "pm list packages --user 5 -f", "dumpsys activity broadcast", "settings get global", "input tap 1 1", "ps -ef; id"):
         assert not read_only_shell(bad), bad
 
 
