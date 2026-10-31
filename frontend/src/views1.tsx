@@ -19,11 +19,24 @@ reg({
   "ov.collect": { en: "Collect system info", ar: "جمع معلومات النظام" }, "ov.collecting": { en: "Collecting…", ar: "جارٍ الجمع…" }, "ov.collected": { en: "collected {when}", ar: "جُمعت في {when}" }, "ov.never": { en: "not collected yet", ar: "لم تُجمع بعد" },
   "ov.host": { en: "Computer name", ar: "اسم الحاسوب" }, "ov.os": { en: "Windows", ar: "ويندوز" }, "ov.ram_gb": { en: "Memory (GB)", ar: "الذاكرة (جيجابايت)" }, "ov.disks": { en: "Disks", ar: "الأقراص" }, "ov.net": { en: "Network", ar: "الشبكة" },
   "ov.free": { en: "{free} GB free of {size} GB", ar: "{free} جيجابايت متاحة من {size}" }, "ov.lastseen": { en: "Last seen", ar: "آخر ظهور" },
+  "conn.title": { en: "Connection", ar: "الاتصال" }, "conn.lastseen": { en: "Last seen", ar: "آخر ظهور" }, "conn.latency": { en: "Response time", ar: "زمن الاستجابة" }, "conn.next": { en: "Next check in {s} s", ar: "الفحص التالي بعد {s} ثانية" },
+  "conn.reconnect": { en: "Reconnect now", ar: "إعادة الاتصال الآن" }, "conn.diagnose": { en: "Diagnose connection", ar: "تشخيص الاتصال" }, "conn.working": { en: "Checking…", ar: "جارٍ الفحص…" }, "conn.verdict": { en: "Result", ar: "النتيجة" }, "conn.ms": { en: "{n} ms", ar: "{n} مللي ثانية" },
+  "conn.never": { en: "never", ar: "أبداً" }, "conn.stillDown": { en: "Still not reachable.", ar: "ما زال غير قابل للوصول." }, "conn.backOnline": { en: "Connected.", ar: "تم الاتصال." },
+  "conn.step.policy": { en: "Address allowed (private network)", ar: "العنوان مسموح (شبكة خاصة)" }, "conn.step.tcp": { en: "Computer answers on the network", ar: "الحاسوب يستجيب على الشبكة" }, "conn.step.tls": { en: "Secure identity matches", ar: "الهوية الآمنة مطابقة" },
+  "conn.step.auth": { en: "Saved credential accepted", ar: "بيانات الاعتماد المحفوظة مقبولة" }, "conn.step.latency": { en: "Response speed", ar: "سرعة الاستجابة" },
+  "hint.timeout": { en: "No reply at all: the computer is asleep, switched off, out of Wi-Fi range or on another network. Wake it, or check its power and network settings (see the “Power and network” check).", ar: "لا يوجد أي رد: الحاسوب في وضع السكون أو مغلق أو خارج نطاق الواي فاي أو على شبكة أخرى. أيقظه أو افحص إعدادات الطاقة والشبكة (راجع فحص «الطاقة والشبكة»)." },
+  "hint.refused": { en: "The computer answers, but the CIT Worker program is not running or not listening. Start the Worker (it starts when the user logs on).", ar: "الحاسوب يستجيب لكن برنامج CIT Worker غير شغّال أو لا يستمع. شغّل البرنامج (يبدأ عند تسجيل دخول المستخدم)." },
+  "hint.identity": { en: "The certificate is different from the one you confirmed. Do NOT connect until you verify it on the computer.", ar: "الشهادة تختلف عن التي أكدتها. لا تتصل قبل التحقق منها على الحاسوب." },
+  "hint.auth": { en: "The Worker rejected the saved credential (revoked, expired, or its data was reset). Enroll the computer again.", ar: "رفض Worker بيانات الاعتماد المحفوظة (أُلغيت أو انتهت أو أُعيدت تهيئة بياناته). سجّل الحاسوب من جديد." },
+  "hint.unreachable": { en: "No route to the computer: wrong address, or this PC is not on the same network or VPN.", ar: "لا يوجد مسار إلى الحاسوب: عنوان خاطئ أو هذا الجهاز ليس على نفس الشبكة أو الـ VPN." },
+  "hint.tls": { en: "The connection started but the secure handshake failed. Another program may be using that port.", ar: "بدأ الاتصال لكن فشل التفاوض الآمن. قد يكون برنامج آخر يستخدم هذا المنفذ." },
+  "hint.locked": { en: "The Worker is locked or its authorization window ended. Unlock it on the computer.", ar: "الـ Worker مقفل أو انتهت فترة التفويض. افتحه على الحاسوب." },
+  "hint.other": { en: "The Worker did not respond as expected.", ar: "لم يستجب Worker كما هو متوقع." },
   "diag.pick": { en: "Check", ar: "الفحص" }, "diag.run": { en: "Run read-only check", ar: "تشغيل فحص للقراءة فقط" }, "diag.hint": { en: "These checks only read information. Nothing is changed on the computer.", ar: "هذه الفحوصات تقرأ المعلومات فقط. لا يتم تغيير أي شيء على الحاسوب." },
   "diag.inventory.system": { en: "System information", ar: "معلومات النظام" }, "diag.inventory.apps": { en: "Installed software", ar: "البرامج المثبتة" }, "diag.services.list": { en: "Windows services", ar: "خدمات ويندوز" },
   "diag.processes.top": { en: "Running programs (top memory)", ar: "البرامج العاملة (الأعلى استهلاكاً للذاكرة)" }, "diag.eventlog.recent": { en: "Recent errors (event log)", ar: "الأخطاء الأخيرة (سجل الأحداث)" },
   "diag.windows.update.status": { en: "Windows Update status", ar: "حالة تحديث ويندوز" }, "diag.disk.usage": { en: "Disk usage and cleanup candidates", ar: "استخدام القرص وما يمكن تنظيفه" },
-  "diag.network.diag": { en: "Network check", ar: "فحص الشبكة" }, "diag.backup.status": { en: "Backup status", ar: "حالة النسخ الاحتياطي" },
+  "diag.power.diag": { en: "Power and network (why offline?)", ar: "الطاقة والشبكة (لماذا غير متصل؟)" }, "diag.network.diag": { en: "Network check", ar: "فحص الشبكة" }, "diag.backup.status": { en: "Backup status", ar: "حالة النسخ الاحتياطي" },
   "hist.when": { en: "When", ar: "الوقت" }, "hist.job": { en: "Job", ar: "المهمة" }, "hist.risk": { en: "Risk", ar: "الخطورة" }, "hist.result": { en: "Result", ar: "النتيجة" }, "hist.exit": { en: "Exit code", ar: "رمز الخروج" },
   "hist.who": { en: "Who", ar: "بواسطة" }, "hist.action": { en: "Action", ar: "الإجراء" }, "hist.detail": { en: "Detail", ar: "التفاصيل" },
   "term.note": { en: "Each command runs as one process (CMD or PowerShell) in this client's workspace on the computer. It is not a persistent shell: a folder change does not carry over to the next command.", ar: "كل أمر يعمل كعملية واحدة (CMD أو PowerShell) داخل مساحة عمل هذا العميل على الحاسوب. ليست طرفية دائمة: تغيير المجلد لا ينتقل إلى الأمر التالي." },
@@ -97,16 +110,27 @@ function Workspace({ wid, oid, onBack, row }: { wid: string; oid: string; onBack
 
 function useLatest(wid: string, kind: string) { return useData<{ ts: number | null; data: any }>(`/workers/${wid}/inventory/${kind}`); }
 
+function ConnectionCard({ wid }: { wid: string }) {
+  useLang(); const c = useData<any>(`/workers/${wid}/connection`, 5000); const { err, busy, go } = useAct(); const [diag, setDiag] = useState<any>(null); const [msg, setMsg] = useState(""); const d = c.data;
+  return <div className="card"><div className="row"><h3 style={{ flex: 1, margin: 0 }}>{t("conn.title")}</h3>{d && <Pill v={d.state} />}
+      <button className="btn ghost sm" disabled={busy} onClick={() => go(async () => { const r = await api<any>(`/workers/${wid}/reconnect`, "POST"); setMsg(r.state === "online" ? t("conn.backOnline") : t("conn.stillDown")); c.reload(); })}>{busy ? t("conn.working") : t("conn.reconnect")}</button>
+      <button className="btn ghost sm" disabled={busy} onClick={() => go(async () => setDiag(await api(`/workers/${wid}/diagnose`, "POST")))}>{t("conn.diagnose")}</button></div>
+    <Err m={err || c.err} />{d && <div className="grid mt"><div><div className="tag">{t("conn.lastseen")}</div><b>{d.last_seen ? when(d.last_seen) : t("conn.never")}</b></div><div><div className="tag">{t("conn.latency")}</div><b className="ltr">{d.latency_ms != null ? t("conn.ms", { n: d.latency_ms }) : "—"}</b></div>
+      {d.next_check_in != null && <div><div className="tag">{t("conn.next", { s: d.next_check_in })}</div></div>}</div>}
+    {d?.error_code && <div className="banner mt">{t("hint." + d.error_code)}</div>}{msg && <div className="tag mt">{msg}</div>}
+    {diag && <div className="mt"><div className="tbl-wrap"><table><tbody>{diag.steps.map((s: any) => <tr key={s.step}><td>{s.ok ? "✔" : "✖"}</td><td>{t("conn.step." + s.step)}</td><td className="num ltr">{t("conn.ms", { n: s.ms })}</td><td className="tag ltr">{s.detail}</td></tr>)}</tbody></table></div>{diag.verdict !== "ok" && <div className="banner mt">{t("conn.verdict")}: {t("hint." + diag.verdict)}</div>}</div>}</div>;
+}
+
 function Overview({ wid, oid, row }: { wid: string; oid: string; row?: DevRow }) {
   useLang(); const m = useData<any[]>(`/workers/${wid}/metrics?hours=6`, 15000); const inv = useLatest(wid, "inventory.system"); const { err, busy, go } = useAct(); const d = inv.data?.data;
-  return <><div className="grid"><div className="card"><Spark label={t("ov.cpu")} values={(m.data ?? []).map(x => x.cpu)} /></div><div className="card"><Spark label={t("ov.ram")} values={(m.data ?? []).map(x => x.ram)} /></div><div className="card"><Spark label={t("ov.disk")} values={(m.data ?? []).map(x => x.disk)} /></div></div>
+  return <><ConnectionCard wid={wid} /><div className="grid mt"><div className="card"><Spark label={t("ov.cpu")} values={(m.data ?? []).map(x => x.cpu)} /></div><div className="card"><Spark label={t("ov.ram")} values={(m.data ?? []).map(x => x.ram)} /></div><div className="card"><Spark label={t("ov.disk")} values={(m.data ?? []).map(x => x.disk)} /></div></div>
     <div className="card mt"><div className="row"><button className="btn" disabled={busy} onClick={() => go(async () => { const r = await api<any>(`/workers/${wid}/inventory/inventory.system`, "POST"); if (r.status !== "ok") throw new Error(r.error || r.status); inv.reload(); })}>{busy ? t("ov.collecting") : t("ov.collect")}</button>
       <span className="tag">{inv.data?.ts ? t("ov.collected", { when: when(inv.data.ts) }) : t("ov.never")}</span>{row?.last_seen && <span className="tag">{t("ov.lastseen")}: {when(row.last_seen)}</span>}</div><Err m={err} />
       {d && <div className="grid mt"><div><div className="tag">{t("ov.host")}</div><b className="ltr">{d.host}</b></div><div><div className="tag">{t("ov.os")}</div><b className="ltr">{d.os?.Caption} {d.os?.Version}</b></div><div><div className="tag">CPU</div><b className="ltr">{d.cpu?.Name}</b></div><div><div className="tag">{t("ov.ram_gb")}</div><b className="ltr">{d.ram_gb}</b></div>
         <div><div className="tag">{t("ov.disks")}</div>{(d.disks ?? []).map((k: any) => <div key={k.DeviceID} className="ltr">{k.DeviceID} {t("ov.free", { free: k.free_gb, size: k.size_gb })}</div>)}</div><div><div className="tag">{t("ov.net")}</div>{(d.net ?? []).map((n: any) => <div key={n.InterfaceAlias} className="ltr">{n.InterfaceAlias}: {n.ipv4}</div>)}</div></div>}</div></>;
 }
 
-const DIAG = ["inventory.system", "inventory.apps", "services.list", "processes.top", "eventlog.recent", "windows.update.status", "disk.usage", "network.diag", "backup.status"];
+const DIAG = ["power.diag", "inventory.system", "inventory.apps", "services.list", "processes.top", "eventlog.recent", "windows.update.status", "disk.usage", "network.diag", "backup.status"];
 function Diagnostics({ wid }: { wid: string }) {
   useLang(); const [kind, setKind] = useState(DIAG[0]); const latest = useLatest(wid, kind); const { err, busy, go } = useAct(); const data = latest.data?.data; const list = Array.isArray(data) ? data : null;
   return <div className="card"><div className="tag">{t("diag.hint")}</div><div className="row mt"><label style={{ margin: 0 }}>{t("diag.pick")}</label><select aria-label={t("diag.pick")} style={{ width: 300 }} value={kind} onChange={e => setKind(e.target.value)}>{DIAG.map(k => <option key={k} value={k}>{t("diag." + k)}</option>)}</select>

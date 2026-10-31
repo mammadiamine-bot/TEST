@@ -149,3 +149,7 @@ class WorkerClient(AgentClient):
 
     def call(self, method: str, path: str, body: dict | None = None):
         return self._req(method, path, body, retries=3 if method == "GET" else 0)
+
+    def probe(self, path: str, timeout: int = 5):
+        """Health check: one short attempt, no retries, so a sleeping computer is noticed in seconds, not minutes."""
+        return self._req("GET", path, None, timeout=timeout, retries=0)

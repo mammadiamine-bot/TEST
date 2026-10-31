@@ -95,7 +95,10 @@ def test_offline_detection_and_automatic_reconnect(ctrl):
     wid = enroll(ctrl)
     ctrl.srv.shutdown(); ctrl.srv.server_close()
     ws = ctrl.app.state.workers
-    assert ws.poll_once()[wid] is False and ctrl.c.get(f"/workers/{wid}").json()["status"] == "offline"
+    assert ws.poll_once()[wid] is False
+    assert ctrl.c.get(f"/workers/{wid}").json()["state"] != "online"                          # a missed probe is never shown as online
+    ws.poll_once(); ws.poll_once()
+    assert ctrl.c.get(f"/workers/{wid}").json()["status"] == "offline"                       # three in a row: offline
     r = ctrl.c.get(f"/workers/{wid}/w/status")
     assert r.status_code == 502 and "unreachable" in r.text
     srv2 = cw.serve(ctrl.w, "127.0.0.1", ctrl.port)[0]  # the site's network comes back; same identity

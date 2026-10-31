@@ -55,6 +55,19 @@ def build_router(workers: Workers) -> APIRouter:
     def rm(wid: str, revoke: bool = True):
         workers.remove(wid, revoke); return {"ok": True}
 
+    @r.get("/workers/{wid}/connection")
+    def connection(wid: str):
+        v = workers.get(wid)
+        return {k: v.get(k) for k in ("id", "name", "address", "state", "online", "last_seen", "fails", "error_code", "last_error", "hint", "latency_ms", "next_check_in", "credential_loaded")}
+
+    @r.post("/workers/{wid}/diagnose")
+    def diagnose(wid: str, request: Request):
+        return workers.diagnose(wid, request.state.principal.id)
+
+    @r.post("/workers/{wid}/reconnect")
+    def reconnect(wid: str, request: Request):
+        return workers.reconnect(wid, request.state.principal.id)
+
     @r.post("/workers/poll")
     def poll():
         return workers.poll_once()

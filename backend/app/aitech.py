@@ -23,6 +23,8 @@ READ_TOOLS = {k: v for k, v in TEMPLATES.items() if v["risk"] == "read"}
 ROUTES = [  # keyword -> read-only tools (deterministic: no model, no tokens)
     (r"slow|cpu|memory|\bram\b|freez|lag|hang", ["inventory.system", "processes.top"]),
     (r"disk|space|storage|full|cleanup|clean up", ["inventory.system", "disk.usage"]),
+    (r"sleep|standby|power|battery|goes offline|keeps (disconnect|dropping)|drops off", ["power.diag", "network.diag"]),
+    (r"sleep|standby|power|battery|goes offline|keeps (disconnect|dropping)|drops off", ["power.diag", "network.diag"]),
     (r"network|internet|wi-?fi|dns|connect|offline|ping", ["network.diag"]),
     (r"update|patch|hotfix|reboot", ["windows.update.status"]),
     (r"backup|restore|recover", ["backup.status"]),
@@ -111,6 +113,28 @@ def analyse(kind: str, data) -> list[dict]:
             out.append({"severity": "warning", "title": f"{len(data)} recent error/warning events", "evidence": f"most recent: {data[0].get('ProviderName')} (id {data[0].get('Id')})", "next": "Review the event log for the repeating provider."})
         elif kind == "disk.usage" and isinstance(data, dict) and (data.get("temp_mb") or 0) > 2000:
             out.append({"severity": "info", "title": "Large temporary-files folder", "evidence": f"{data['temp_mb']} MB in TEMP", "next": "Safe to clean with approval."})
+        elif kind == "power.diag" and isinstance(data, dict):
+            idx = {"AC": None, "DC": None}
+            for line in data.get("sleep_settings") or []:
+                for k in idx:
+                    if f"Current {k} Power Setting Index" in line:
+                        idx[k] = int(line.split(":")[-1].strip(), 16)
+            cs = any("Low Power Idle" in x for x in (data.get("sleep_states") or [])[:3])
+            for k, label in (("DC", "on battery"), ("AC", "when plugged in")):
+                if idx[k]:
+                    out.append({"severity": "warning", "title": f"This computer goes to sleep {label} after {idx[k] // 60} minutes" + (" and loses its network (Modern Standby)" if cs else ""),
+                                "evidence": f"Sleep after ({k}) = {idx[k]} s", "next": "Ask the owner to approve changing the sleep setting, or keep the computer plugged in. CIT never changes power settings by itself."})
+        elif kind == "power.diag" and isinstance(data, dict):
+            idx = {"AC": None, "DC": None}
+            for line in data.get("sleep_settings") or []:
+                for k in idx:
+                    if f"Current {k} Power Setting Index" in line:
+                        idx[k] = int(line.split(":")[-1].strip(), 16)
+            cs = any("Low Power Idle" in x for x in (data.get("sleep_states") or [])[:3])
+            for k, label in (("DC", "on battery"), ("AC", "when plugged in")):
+                if idx[k]:
+                    out.append({"severity": "warning", "title": f"This computer goes to sleep {label} after {idx[k] // 60} minutes" + (" and loses its network (Modern Standby)" if cs else ""),
+                                "evidence": f"Sleep after ({k}) = {idx[k]} s", "next": "Ask the owner to approve changing the sleep setting, or keep the computer plugged in. CIT never changes power settings by itself."})
         elif kind == "backup.status" and isinstance(data, dict) and not data.get("restore_points") and not data.get("shadow_copies"):
             out.append({"severity": "warning", "title": "No restore point or shadow copy found", "evidence": "none returned", "next": data.get("guidance", "Create a restore point before changes.")})
     except (KeyError, TypeError, ZeroDivisionError):

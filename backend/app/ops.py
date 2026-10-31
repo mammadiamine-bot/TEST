@@ -62,12 +62,22 @@ TEMPLATES: dict[str, dict] = {
         "[pscustomobject]@{restore_points=@(Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Select-Object -Last 3 Description,CreationTime); "
         "shadow_copies=@(Get-CimInstance Win32_ShadowCopy -ErrorAction SilentlyContinue | Select-Object -Last 3 InstallDate); "
         "guidance='If none: enable System Protection or schedule a backup before any destructive change.'}"))},
+    "power.diag": {"title": "Power and network diagnosis (why does this computer go offline?)", "risk": "read", "params": {}, "build": lambda p: ps(_json_ps(
+        "[pscustomobject]@{scheme=((powercfg /getactivescheme) -join ' '); "
+        "sleep_settings=@((powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE) | Where-Object { $_ -match 'Power Setting Index|Power Setting GUID' } | ForEach-Object { $_.Trim() }); "
+        "sleep_states=@((powercfg /a) | Select-Object -First 8 | ForEach-Object { $_.Trim() } | Where-Object { $_ }); "
+        "adapters=@(Get-NetAdapter | Where-Object Status -ne 'Not Present' | Select-Object Name,Status,LinkSpeed,InterfaceDescription); "
+        "adapter_power=@(Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue | Select-Object Name,AllowComputerToTurnOffDevice,WakeOnMagicPacket); "
+        "wifi=@((netsh wlan show interfaces) | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^(SSID|State|Signal|Radio type|Receive rate|Channel)' }); "
+        "uptime_hours=[math]::Round(((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalHours,1); "
+        "power_events=@(Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Kernel-Power','Microsoft-Windows-Power-Troubleshooter'; StartTime=(Get-Date).AddDays(-3)} -MaxEvents 40 -ErrorAction SilentlyContinue | "
+        "Select-Object TimeCreated,Id,@{n='msg';e={($_.Message -split \"`n\")[0]}})}"))},
     "service.restart": {"title": "Restart a Windows service", "risk": "modify", "params": {"name": r"^[A-Za-z0-9_.-]{1,64}$"}, "build": lambda p: ps(f"Restart-Service -Name '{p['name']}' -Force -ErrorAction Stop; (Get-Service '{p['name']}').Status.ToString()")},
     "service.stop": {"title": "Stop a Windows service", "risk": "modify", "params": {"name": r"^[A-Za-z0-9_.-]{1,64}$"}, "build": lambda p: ps(f"Stop-Service -Name '{p['name']}' -Force -ErrorAction Stop; (Get-Service '{p['name']}').Status.ToString()")},
     "system.reboot": {"title": "Reboot the computer (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: {"shell": "cmd", "body": "shutdown /r /t 60 /c \"Restart requested by your IT provider\""}},
     "system.shutdown": {"title": "Shut the computer down (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: {"shell": "cmd", "body": "shutdown /s /t 60 /c \"Shutdown requested by your IT provider\""}},
 }
-INVENTORY_KINDS = ("inventory.system", "inventory.apps", "services.list", "processes.top", "eventlog.recent", "windows.update.status", "disk.usage", "network.diag", "backup.status")
+INVENTORY_KINDS = ("inventory.system", "inventory.apps", "services.list", "processes.top", "eventlog.recent", "windows.update.status", "disk.usage", "network.diag", "backup.status", "power.diag")
 
 
 def render_template(tid: str, params: dict | None) -> dict:
