@@ -69,6 +69,45 @@ What was built so you can do it and get real evidence:
 **Backend suite on Windows:** the failures are existing Linux-only test assumptions, identical with and without these changes where compared (api2 3, connections 1, security 1, servers 4: fake `ssh`/`sh` scripts, CRLF, DPAPI-off-Windows test); test_tasks (6) and test_worker (7) were not baseline-compared; workers_ctrl 2 (a 1 s timing assert vs Windows' ~2 s connect refusal, and a fake-`claude` shell script). CI for this commit never finished (stalled), so the committed `.exe`s are local builds.
 **Not built yet (planned):** generic client/site/device model, RBAC, multi-OS adapters (WinRM/RDP/SSH plugin layer), Internet/VPN path, restore points — see docs/ARCHITECTURE-ASSESSMENT.md once written. Internet access and third-device control are NOT operational.
 
+## RMM PLATFORM — implementation checklist (2026-10-31)
+Legend: **VERIFIED** = tested by automated tests AND/OR run on real hardware (evidence named) · **IMPLEMENTED** = code + tests with fakes/loopback, not run on the real thing · **BLOCKED** = needs something only the owner can supply · **NOT IMPLEMENTED**.
+Real hardware used: Windows 11 controller + Windows 10 Worker (LAN, 192.168.x.x), local Ollama `qwen2.5:1.5b`.
+
+| Area | Feature | State | Evidence / caveat |
+|---|---|---|---|
+| A tenancy | Clients, sites, devices/workers, assignment, groups, tags | VERIFIED | `test_tenancy` `test_rbac`; live assignment of the real Worker |
+| A tenancy | Roles owner/administrator/technician/viewer/customer, default-deny, server-side scoping | VERIFIED | 22 tests; live: other-client token 403 on 5/5 probes |
+| A tenancy | Invitations (single use, expiring, hash-only), token rotation/revocation, auth rate limit | VERIFIED | `test_rbac` |
+| A tenancy | Offboarding + retention + purge, per-client audit trail | VERIFIED (API) | `test_rbac`; offline Workers need `revoke-all` on the machine |
+| B worker | Reconnect after restart/network loss, heartbeat/health | VERIFIED | Wi-Fi outage, controller restart, reboot (earlier milestones) |
+| B worker | Inventory: OS/CPU/RAM/disks/network, apps, services, processes, event log, Windows Update, disk usage, network diag, backup status | VERIFIED | all 9 templates ran on the real Win10 Worker; UI collected services (268) |
+| B worker | Windows Service install | BLOCKED | needs an administrator; the no-admin Startup-folder launcher is VERIFIED (reboot) |
+| B worker | Signed installer, secure versioned updates + rollback | NOT IMPLEMENTED | no code-signing certificate; updates are manual |
+| B worker | CPU/RAM resource limits for jobs | NOT IMPLEMENTED | time limits and output caps exist |
+| B conn | Outbound-only relay transport | NOT IMPLEMENTED | design in `docs/INTERNET-ACCESS.md` |
+| B conn | Tailscale/WireGuard Internet access | BLOCKED | needs the owner's accounts + a second network; controller already refuses public addresses and classifies lan/overlay |
+| C ops | CMD + PowerShell execution, cancel, exit codes, history | VERIFIED | real Worker, via API and dashboard |
+| C ops | Template library, versioned scripts, multi-device jobs, retry, cancel, per-device history | VERIFIED | `test_ops` (9) + live job incl. quoted PowerShell, cancel |
+| C ops | Approval: four-eyes for modifying jobs/schedules, typed phrase for disruptive, reboot/shutdown | VERIFIED (logic) | live: self-approval 403; **no real reboot/shutdown was ever run** |
+| C ops | Schedules (read-only unattended; modifying ones need a second person) | VERIFIED (logic) | `test_ops`; not run unattended on the real Worker |
+| C ops | Service restart/stop, controlled patch workflow, cleanup actions | IMPLEMENTED / NOT IMPLEMENTED | service restart/stop templates need approval, not run live; Windows Update is status only (no install workflow); cleanup is recommendation only |
+| C ops | File manager within boundaries | VERIFIED | existing Worker workspace API (earlier milestone) |
+| D monitor | Metrics history, threshold rules, dedup alerts, acknowledge, history, retention, fleet/SLA report, tickets | VERIFIED | `test_monitor`; fleet report on live data |
+| D monitor | E-mail notifications | BLOCKED | needs SMTP credentials; without them status is recorded as `not_sent_no_smtp` |
+| E AI | Deterministic router, local Ollama, model fallback, token metering, read-only allowlist, fenced evidence, proposals needing approval | VERIFIED | `test_ai` (8) + real model on the real Worker: no actions executed |
+| E AI | Cloud AI fallback | NOT IMPLEMENTED | disabled by design; existing Claude provider untested |
+| E AI | Claude Code tasks on a Worker | BLOCKED | needs the Worker's own Claude login + owner approval |
+| E AI | Qwen3-8B / Qwen2.5-Coder-14B | NOT TESTED | only `qwen2.5:1.5b` is installed; larger models are chosen automatically if pulled |
+| F UI | Overview, Clients/Sites, Devices+details, Terminal/Files (Worker page), Jobs, Monitoring/Alerts, Scripts, AI, Tickets/Reports, Technicians/Roles, Subscription, Audit, Settings | VERIFIED | 13-step real-browser run on live data; Barmajli light theme + dark; search/pagination/empty/error states |
+| F UI | Arabic/RTL | PARTIAL | navigation and direction verified; page bodies are English |
+| F UI | Customer portal view | IMPLEMENTED | role-filtered navigation; server enforcement VERIFIED by tests |
+| G commercial | Plans, signed single-use licenses, fail-closed entitlements, device limits, usage metering, draft invoices, history | VERIFIED | `test_billing` (6) |
+| G commercial | Payment provider | BLOCKED | needs merchant credentials and approval; nothing is ever charged |
+| H deploy | Backup/verify/restore, pre-migration copy, `/ready`, JSON logs, token-file + production checks | VERIFIED | `test_ops_admin` (5) |
+| H deploy | Dockerfiles, Compose, Caddy HTTPS config, `.env` template, CI validation | IMPLEMENTED | NOT run: no Docker here; CI job added |
+| H deploy | Threat model, deployment, onboarding docs | DONE | `docs/THREAT-MODEL.md`, `docs/DEPLOYMENT.md`, `docs/CUSTOMER-ONBOARDING.md` |
+| Security | Unkeyed audit chain, no MFA/SSO/token expiry, unsigned binaries | OPEN | listed in the threat model |
+
 ## M6 — multi-client foundation (2026-10-30)
 **TESTED:** organizations → sites → devices/workers; scoped `technician`/`viewer` tokens (hash-only, revocable instantly); default-deny cross-client isolation in one choke point (`backend/app/tenancy.py`); audited denials; DB migration; per-client fleet view and onboarding steps; connection-path classification (lan/overlay/loopback). 12 new tests pass; auth-path regression (flow, security, api2, workers_ctrl) shows only the 6 known Windows-only failures. Live: real Win10 Worker assigned to a client+site on the running controller; a scoped token got its own fleet (200) and was denied global routes (403).
 **IMPLEMENTED, not verified in a browser:** dashboard page *Clients & sites* (type-checked only).

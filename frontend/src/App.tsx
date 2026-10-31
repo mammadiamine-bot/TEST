@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "./api";
+import { api, hasToken, signIn, signOut } from "./api";
 import { setLang, t, useLang } from "./i18n";
 import * as P from "./pages";
 import * as Q from "./pages2";
@@ -35,7 +35,22 @@ const SECTIONS: [string, Page][] = [
   ["deployments", Q.Deployments], ["history", Q.History], ["reports", tabbed([["reports", P.Reports], ["audit", P.Audit]])], ["settings", Settings],
 ];
 
+function Login({ onDone }: { onDone: () => void }) {
+  const [tok, setTok] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const go = async () => { setBusy(true); setErr(""); signIn(tok.trim()); try { await api("/me"); onDone(); } catch (e: any) { signOut2(); setErr(e.message); } finally { setBusy(false); } };
+  const signOut2 = () => { try { sessionStorage.removeItem("cit_token"); } catch {} };
+  return <div style={{ maxWidth: 420, margin: "12vh auto" }} className="card"><h2 style={{ marginTop: 0 }}>{t("app")}</h2><label htmlFor="tok">Access token</label>
+    <input id="tok" type="password" autoComplete="off" value={tok} onChange={e => setTok(e.target.value)} onKeyDown={e => e.key === "Enter" && tok && go()} />
+    {err && <div className="err mt" role="alert">{err}</div>}<button className="btn mt" disabled={busy || !tok} onClick={go}>Sign in</button>
+    <div className="tag mt">Your administrator gives you a personal token (or an invitation to create one). It is kept only in this browser tab.</div></div>;
+}
+
 export default function App() {
+  const [authed, setAuthed] = useState(hasToken());
+  return authed ? <Main /> : <Login onDone={() => setAuthed(true)} />;
+}
+
+function Main() {
   const lang = useLang();
   const [page, setPage] = useState(0);
   const [devices, setDevices] = useState<P.Device[]>([]);
@@ -67,6 +82,7 @@ export default function App() {
         <h1>{t("app")}<small>v0.2 · M2</small></h1>
         {SECTIONS.map(([k], i) => (!customer || CUSTOMER_PAGES.includes(k)) && <button key={k} className={page === i ? "on" : ""} onClick={() => setPage(i)}>{t(k)}</button>)}
         <div style={{ flex: 1 }} />
+        <button onClick={signOut}>Sign out</button>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{t("theme")}</button>
         <button onClick={() => setLang(lang === "en" ? "ar" : "en")}>{t("lang")}</button>
       </nav>

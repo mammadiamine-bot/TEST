@@ -1,0 +1,19 @@
+# {$CIT_DOMAIN}: your DNS name (Caddy obtains a certificate automatically). For a local trial use "localhost".
+{$CIT_DOMAIN:localhost} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	}
+	handle_path /api/* {
+		reverse_proxy backend:8765
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

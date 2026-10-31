@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS inventory(worker_id TEXT NOT NULL, kind TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 
+SCHEMA_VERSION = 3  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables
 MIGRATIONS = [("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 
@@ -90,6 +91,12 @@ class Db:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        if str(path) != ":memory:" and Path(path).exists() and Path(path).stat().st_size > 0:
+            probe = sqlite3.connect(str(path))
+            ver = probe.execute("PRAGMA user_version").fetchone()[0]; probe.close()
+            if ver < SCHEMA_VERSION:  # safe migrations: keep a byte-for-byte copy before the schema is touched
+                import shutil
+                shutil.copy2(path, str(path) + f".pre-v{SCHEMA_VERSION}.bak")
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.lock = threading.RLock()
@@ -99,6 +106,7 @@ class Db:
             for table, col, typ in MIGRATIONS:
                 if col not in {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}:
                     self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+            self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self.conn.commit()
 
     def execute(self, sql: str, args: tuple = ()) -> sqlite3.Cursor:

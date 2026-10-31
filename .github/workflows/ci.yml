@@ -18,6 +18,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: cd frontend && npm ci && npm test && npm run build
+  deploy-config:  # validates the Docker/Caddy files; builds the images (first run = first verification)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp deploy/.env.example deploy/.env && docker compose -f deploy/docker-compose.yml config -q
+      - run: docker build -f deploy/Dockerfile.backend -t cit-backend .
+      - run: docker build -f deploy/Dockerfile.web -t cit-web .
   windows-installer:  # UNTESTED until first run on GitHub
     needs: [backend, frontend]
     runs-on: windows-latest

@@ -1,6 +1,10 @@
 export type Json = any;
 let base = (import.meta as any).env?.VITE_API_URL ?? "http://127.0.0.1:8765";
-let token: string = (import.meta as any).env?.VITE_API_TOKEN ?? "";
+const stored = (): string => { try { return sessionStorage.getItem("cit_token") ?? ""; } catch { return ""; } };
+let token: string = (import.meta as any).env?.VITE_API_TOKEN ?? stored();  // dev/Tauri inject one; the web build asks the person to sign in (per tab, never persisted)
+export const hasToken = () => !!token;
+export function signIn(t: string) { token = t; try { sessionStorage.setItem("cit_token", t); } catch {} }
+export function signOut() { token = ""; try { sessionStorage.removeItem("cit_token"); } catch {} location.reload(); }
 
 /** In the Tauri shell the Rust side owns the per-launch token and hands it over via an IPC command. */
 export async function initConfig() {

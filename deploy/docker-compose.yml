@@ -1,0 +1,26 @@
+# Production-style stack: Caddy (HTTPS) -> controller API. Only Caddy publishes ports; the API and its data stay on the private network.
+# NOT VERIFIED in the authoring environment (no Docker there): run `docker compose config` and a smoke test per docs/DEPLOYMENT.md.
+name: cit
+services:
+  backend:
+    build: { context: .., dockerfile: deploy/Dockerfile.backend }
+    env_file: .env
+    volumes: [ "cit-data:/data" ]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [ /tmp ]
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+    networks: [ internal ]
+  web:
+    build: { context: .., dockerfile: deploy/Dockerfile.web }
+    environment: [ "CIT_DOMAIN=${CIT_DOMAIN:-localhost}" ]
+    ports: [ "80:80", "443:443" ]
+    volumes: [ "caddy-data:/data" ]
+    depends_on: [ backend ]
+    restart: unless-stopped
+    networks: [ internal, edge ]
+volumes: { cit-data: {}, caddy-data: {} }
+networks:
+  internal: { internal: false }
+  edge: {}

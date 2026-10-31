@@ -1,0 +1,11 @@
+# Controller API. Runs as an unprivileged user; data lives in the /data volume.
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 CIT_DATA_DIR=/data CIT_HOST=0.0.0.0 CIT_PORT=8765 CIT_ALLOW_MOCK=0
+WORKDIR /srv
+COPY backend/requirements.txt /srv/requirements.txt
+RUN pip install -r requirements.txt && useradd -r -u 10001 cit && mkdir /data && chown cit /data
+COPY backend/app /srv/app
+USER cit
+VOLUME /data
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/ready', timeout=4).status==200 else 1)"
+CMD ["python", "-m", "app.main"]

@@ -106,6 +106,14 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     def health():
         return {"ok": True}
 
+    @app.get("/ready")
+    def ready():
+        """Readiness for orchestrators: the database answers and the audit chain verifies. No tenant data."""
+        try:
+            return {"ready": bool(core.db.one("SELECT 1 AS x")) and core.db.verify_audit_chain()}
+        except Exception:  # noqa: BLE001
+            raise HTTPException(503, "not ready")
+
     r = APIRouter(dependencies=[Depends(require_token)])
 
     @r.get("/status")

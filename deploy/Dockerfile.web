@@ -1,0 +1,11 @@
+# Builds the dashboard and serves it with Caddy (automatic HTTPS). The API is reached at /api on the same origin.
+FROM node:22-slim AS build
+WORKDIR /w
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+ENV VITE_API_URL=/api
+RUN npm run build
+FROM caddy:2-alpine
+COPY --from=build /w/dist /srv
+COPY deploy/Caddyfile /etc/caddy/Caddyfile

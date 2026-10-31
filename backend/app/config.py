@@ -7,11 +7,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def _owner_token() -> str:
+    """CIT_API_TOKEN_FILE (a Docker/Windows secret file) wins over CIT_API_TOKEN. In production (CIT_ENV=production) a weak token is refused."""
+    f = os.environ.get("CIT_API_TOKEN_FILE")
+    tok = (Path(f).read_text().strip() if f else os.environ.get("CIT_API_TOKEN")) or secrets.token_urlsafe(32)
+    if os.environ.get("CIT_ENV") == "production" and len(tok) < 32:
+        raise SystemExit("refusing to start: the owner token must be at least 32 characters in production")
+    return tok
+
+
 @dataclass
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("CIT_DATA_DIR", Path.home() / ".claude-it-technician")))
     # Per-launch bearer token. The Tauri shell generates it and passes it to the sidecar.
-    api_token: str = field(default_factory=lambda: os.environ.get("CIT_API_TOKEN") or secrets.token_urlsafe(32))
+    api_token: str = field(default_factory=_owner_token)
     allow_mock: bool = os.environ.get("CIT_ALLOW_MOCK", "1") == "1"
     max_session_minutes: int = 240
     pairing_ttl_seconds: int = 600
