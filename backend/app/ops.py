@@ -175,8 +175,15 @@ class Ops:
         """True when the approver is the creator OR minted/invited/last rotated the creator's token: they could act as the creator, so that is not a second person."""
         if creator == approver:
             return True
-        p = self.db.one("SELECT created_by, rotated_by FROM principals WHERE id=?", (creator,))
-        return bool(p) and approver in (p["created_by"], p["rotated_by"])
+        seen, frontier = {creator}, {creator}
+        for _ in range(8):  # transitive: A controls P and P controls V  =>  A controls V. Rows are append-only, so history cannot be rewritten.
+            nxt = {r["controller_id"] for pid in frontier for r in self.db.all("SELECT controller_id FROM principal_controllers WHERE principal_id=?", (pid,))} - seen
+            if approver in nxt:
+                return True
+            seen |= nxt; frontier = nxt
+            if not frontier:
+                break
+        return False
 
     def approve(self, org: str, jid: str, approver: str, is_owner: bool, confirm: str | None) -> dict:
         j = self._job_of(org, jid)

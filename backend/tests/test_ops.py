@@ -219,3 +219,21 @@ def test_an_administrator_cannot_launder_approval_through_a_principal_they_creat
     j3 = TestClient(w.app, headers={"Authorization": "Bearer " + red["token"]}).post(f"/orgs/{w.a}/jobs", json={"shell": "cmd", "body": "echo z", "targets": [w.wk["a"]]}).json()
     assert adm.post(f"/orgs/{w.a}/jobs/{j3['id']}/approve", json={}).status_code == 403      # the inviter counts too
     assert w.owner.post(f"/orgs/{w.a}/jobs/{j3['id']}/approve", json={}).status_code == 200
+
+
+def test_control_history_is_append_only_and_transitive(w):
+    adm_info, adm = w.mint("administrator", [w.a])
+    adm2_info, adm2 = w.mint("administrator", [w.a])
+    p = adm.post("/principals", json={"name": "p", "role": "technician", "org_ids": [w.a]}).json()
+    w.owner.post(f"/principals/{p['id']}/rotate")                                           # a later rotation by someone else must not erase the creator
+    tok = adm2.post(f"/principals/{p['id']}/rotate").json()["token"]
+    puppet = TestClient(w.app, headers={"Authorization": "Bearer " + tok})
+    j = puppet.post(f"/orgs/{w.a}/jobs", json={"shell": "cmd", "body": "echo x", "targets": [w.wk["a"]]}).json()
+    assert adm.post(f"/orgs/{w.a}/jobs/{j['id']}/approve", json={}).status_code == 403       # original creator still blocked
+    assert adm2.post(f"/orgs/{w.a}/jobs/{j['id']}/approve", json={}).status_code == 403      # latest rotator blocked too
+    assert len(w.db.all("SELECT * FROM principal_controllers WHERE principal_id=?", (p["id"],))) == 3
+    # transitive: adm minted v1 (a technician); v1 cannot be used to launder, and adm cannot approve what v1's own minted principals do
+    inner = w.db.one("SELECT 1 AS x")  # placeholder to keep the fixture alive
+    w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES('usr_b','usr_a','created',1)")
+    w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES('usr_c','usr_b','created',1)")
+    assert w.ops._controls("usr_c", "usr_a") is True and w.ops._controls("usr_c", "usr_z") is False

@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS principals(
 
 # additive, idempotent migrations for databases created before multi-client support (existing rows keep org_id NULL = unassigned)
 RMM_SCHEMA = """
+CREATE TABLE IF NOT EXISTS principal_controllers(principal_id TEXT NOT NULL, controller_id TEXT NOT NULL, reason TEXT NOT NULL, at REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS pc_principal ON principal_controllers(principal_id);
 CREATE TABLE IF NOT EXISTS invitations(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, role TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created_by TEXT NOT NULL, created_at REAL NOT NULL, expires_at REAL NOT NULL, used_at REAL, note TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS tags(kind TEXT NOT NULL, rid TEXT NOT NULL, tag TEXT NOT NULL, PRIMARY KEY(kind, rid, tag));
 CREATE TABLE IF NOT EXISTS groups(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE(org_id, name));
@@ -79,7 +81,7 @@ CREATE TABLE IF NOT EXISTS inventory(worker_id TEXT NOT NULL, kind TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 
-SCHEMA_VERSION = 5  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
+SCHEMA_VERSION = 6  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
 MIGRATIONS = [("principals", "created_by", "TEXT"), ("principals", "rotated_by", "TEXT"), ("schedules", "approved_by", "TEXT"), ("job_runs", "remote", "TEXT"), ("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 

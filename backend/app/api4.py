@@ -213,6 +213,7 @@ def build_router(core, workers) -> APIRouter:
         own_principal(request, pid)
         tok = "cit_" + secrets.token_urlsafe(32)
         db.execute("UPDATE principals SET token_hash=?, revoked=0, rotated_by=? WHERE id=?", (token_hash(tok), actor(request), pid))
+        db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES(?,?,?,?)", (pid, actor(request), "rotated", time.time()))
         db.audit(actor(request), "principal.rotated", None, principal=pid)
         return {"id": pid, "token": tok, "note": "shown once; the previous token no longer works"}
 
@@ -361,7 +362,8 @@ def build_router(core, workers) -> APIRouter:
             raise HTTPException(410, "this invitation is invalid, used or expired")
         db.execute("UPDATE invitations SET used_at=? WHERE id=?", (now, row["id"]))
         info, tok = mint_principal(db, b.name, row["role"], [row["org_id"]], "invitation:" + row["id"])
-        db.execute("UPDATE principals SET created_by=? WHERE id=?", (row["created_by"], info["id"]))  # the inviter counts as having created this person
+        db.execute("UPDATE principals SET created_by=? WHERE id=?", (row["created_by"], info["id"]))
+        db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES(?,?,?,?)", (info["id"], row["created_by"], "invited", now))  # the inviter counts as having created this person
         return {**info, "token": tok, "note": "shown once; only a hash is stored"}
 
     r.public = pub

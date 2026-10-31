@@ -152,5 +152,6 @@ def mint_principal(db, name: str, role: str, org_ids: list[str], actor: str) -> 
     pid = new_id("usr")
     db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at,created_by) VALUES(?,?,?,?,?,?,?)",
                (pid, name[:80], role, json.dumps(sorted(set(org_ids))), token_hash(tok), time.time(), actor))
+    db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES(?,?,?,?)", (pid, actor, "created", time.time()))  # append-only: never deleted
     db.audit(actor, "principal.created", None, principal=pid, role=role, orgs=sorted(set(org_ids)))
     return {"id": pid, "name": name, "role": role, "org_ids": sorted(set(org_ids))}, tok
