@@ -84,10 +84,23 @@ CREATE TABLE IF NOT EXISTS android_actions(id TEXT PRIMARY KEY, org_id TEXT NOT 
 CREATE TABLE IF NOT EXISTS chat_conversations(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, user_id TEXT NOT NULL, title TEXT NOT NULL, host TEXT NOT NULL, model TEXT NOT NULL, worker_id TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, conv_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, ms INTEGER DEFAULT 0, ts REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS chat_msg_conv ON chat_messages(conv_id, id);
+CREATE TABLE IF NOT EXISTS agent_sessions(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, actor TEXT NOT NULL, request TEXT NOT NULL, lang TEXT, target_kind TEXT NOT NULL, target TEXT NOT NULL, host TEXT, model TEXT, intent TEXT, status TEXT NOT NULL, outcome TEXT, resolution TEXT, level INTEGER DEFAULT 1, answer TEXT DEFAULT '', report TEXT, cancel INTEGER DEFAULT 0, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, created_at REAL NOT NULL, updated_at REAL NOT NULL, finished_at REAL);
+CREATE INDEX IF NOT EXISTS agent_sessions_org ON agent_sessions(org_id, created_at);
+CREATE TABLE IF NOT EXISTS agent_events(id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, ts REAL NOT NULL, kind TEXT NOT NULL, title TEXT, data TEXT);
+CREATE INDEX IF NOT EXISTS agent_events_s ON agent_events(session_id, id);
+CREATE TABLE IF NOT EXISTS agent_actions(id TEXT PRIMARY KEY, session_id TEXT NOT NULL, org_id TEXT NOT NULL, target_kind TEXT NOT NULL, target TEXT NOT NULL, workflow TEXT NOT NULL, step_idx INTEGER DEFAULT 0, template TEXT, params TEXT, title TEXT, risk TEXT, cls TEXT, status TEXT NOT NULL, job_id TEXT, created_by TEXT, approved_by TEXT, auto INTEGER DEFAULT 0, output TEXT, error TEXT, verify TEXT, created_at REAL NOT NULL, finished_at REAL);
+CREATE INDEX IF NOT EXISTS agent_actions_s ON agent_actions(session_id);
+CREATE TABLE IF NOT EXISTS agent_policy(org_id TEXT PRIMARY KEY, level INTEGER NOT NULL DEFAULT 1, max_auto_per_hour INTEGER NOT NULL DEFAULT 6, updated_by TEXT, updated_at REAL);
+CREATE TABLE IF NOT EXISTS agent_maintenance(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT, targets TEXT NOT NULL, workflows TEXT NOT NULL, expires_at REAL NOT NULL, status TEXT NOT NULL, created_by TEXT, approved_by TEXT, created_at REAL);
+CREATE TABLE IF NOT EXISTS agent_state(k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS kb_procedures(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, key TEXT NOT NULL, version INTEGER NOT NULL, title TEXT NOT NULL, signature TEXT NOT NULL, workflow TEXT, body TEXT, status TEXT NOT NULL, source TEXT NOT NULL, created_by TEXT, approved_by TEXT, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS kb_cases(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, os TEXT, host TEXT, request TEXT, signature TEXT, tokens TEXT, root_cause TEXT, causes TEXT, evidence TEXT, workflow TEXT, outcome TEXT, verified INTEGER DEFAULT 0, confidence REAL DEFAULT 0, feedback INTEGER DEFAULT 0, status TEXT NOT NULL, session_id TEXT, created_at REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS kb_cases_org ON kb_cases(org_id, created_at);
+CREATE TABLE IF NOT EXISTS model_bench(host TEXT NOT NULL, model TEXT NOT NULL, ts REAL NOT NULL, json_ok INTEGER, arabic_ok INTEGER, ms INTEGER, tps REAL, PRIMARY KEY(host, model));
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 
-SCHEMA_VERSION = 9  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
+SCHEMA_VERSION = 10  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
 MIGRATIONS = [("principals", "created_by", "TEXT"), ("principals", "rotated_by", "TEXT"), ("schedules", "approved_by", "TEXT"), ("job_runs", "remote", "TEXT"), ("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 

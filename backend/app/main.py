@@ -11,6 +11,7 @@ from .api import create_app
 
 app = create_app()
 app.state.workers.start_monitor()
+app.state.agent.start_ticker()  # advances AI technician sessions after approvals
 app.state.ops.start_scheduler()  # runs due schedules  # reconnects to Worker Stations automatically after network interruptions
 
 

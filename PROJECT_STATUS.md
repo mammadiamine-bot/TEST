@@ -162,6 +162,30 @@ Real hardware used: Windows 11 controller + Windows 10 Worker (LAN, 192.168.x.x)
 Linux cloud container. Python 3.13, Node 22, Rust 1.97. **No Windows, no PowerShell, no WebView2** â†’ Windows-specific parts could not be executed.
 `C:\Users\AMINE\.claude\skills` is not reachable from this container; only the repo's `.claude/skills` (ui-ux-pro-max etc.) exist.
 
+# AI TECHNICIAN AGENT (2026-10-31)
+
+Code: `backend/app/agent.py` (loop), `diag.py` (rules/playbooks/Arabic), `diagtemplates.py` (typed read + repair templates), `repairs.py` (reviewed workflow library), `knowledge.py` (local cases/procedures), `api12.py`; UI `frontend/src/agent.tsx`. Tests: `backend/tests/test_aitech_agent.py` (29).
+
+| Item | Status | Evidence |
+|---|---|---|
+| Agent loop: understand > plan > collect > analyse > rank causes > repair options > policy/approval > execute > verify > report > remember | VERIFIED | 29 tests; live runs on the Win11 Main PC and the Win10 Worker (6/6 checks, real metrics) |
+| Never "healthy" without all checks; 6 states (healthy, problem detected, inconclusive, check failed, unreachable, permission required) | VERIFIED | tests + live: Worker "slow" = inconclusive (CPU 3%, RAM 54%), Main PC "slow" = problem detected (RAM 95%, CPU 87%, caused by Claude Code itself) |
+| Autonomy levels 0-4 (default 1, owner-only), emergency stop, per-hour cap, maintenance plans (four-eyes), disruptive never automatic | VERIFIED (tests) | tests; levels 2-4 not left on by me |
+| Safe auto-repair (temp files, DNS cache, safe services, reconnect) with before/after verification and typed rollback | VERIFIED in tests (fake Windows state); NOT yet run unattended on a real machine | live repair on real devices: see below |
+| Approval repairs (close app, restart update services, restart) via existing four-eyes | VERIFIED in tests; live: owner approved 2 on the Worker and both FAILED honestly (see Limitations) | session ags_7f224056c96c |
+| Local knowledge: verified/unverified cases, similarity search, feedback, procedures with versions and review, import/export/restore | VERIFIED (tests) | procedures can only point at reviewed library workflows |
+| Model registry (size, context, tool/JSON/Arabic tiers, hardware fit, measured benchmark) | VERIFIED | qwen2.5:1.5b: tool choice poor, Arabic poor; benchmark measures JSON and Arabic |
+| Android troubleshooting (not detected, unauthorized, offline, crash from logcat, ADB restart) | VERIFIED with a fake adb; Main PC devices were in use by the owner live | CIT never bypasses authorization |
+| Worker connectivity check + reconnect | VERIFIED | live |
+| UI (Arabic/English, live timeline, causes, approvals, before/after, history, knowledge, models, autonomy) | VERIFIED in a real browser | screenshots |
+
+Limitations (honest):
+* The Worker's service account is not an administrator: `Restart-Service bits` was refused ("Cannot open bits service"). Service repairs need an elevated Worker (Windows Service installer is still not built).
+* `system.reboot` had a quoting bug (shutdown printed usage). Fixed (now PowerShell); syntax verified on the Main PC (scheduled + aborted); a real Worker restart was NOT re-run.
+* Qwen 1.5B: Arabic explanations are mediocre and it cannot pick tools reliably; diagnosis does not depend on it. A 7B+ model is recommended (not downloaded).
+* Background proactive monitoring/incident auto-creation is NOT implemented (only on-demand sessions). Unattended scheduled maintenance is NOT implemented beyond level-4 plans applied when a session runs.
+* Retrieval is keyword/cosine over past cases (no embeddings); documentation retrieval is limited to the built-in workflow library.
+
 ## Verified (run in this environment)
 | Item | Evidence |
 |---|---|

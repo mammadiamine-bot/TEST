@@ -74,10 +74,13 @@ TEMPLATES: dict[str, dict] = {
         "Select-Object TimeCreated,Id,@{n='msg';e={($_.Message -split \"`n\")[0]}})}"))},
     "service.restart": {"title": "Restart a Windows service", "risk": "modify", "params": {"name": r"^[A-Za-z0-9_.-]{1,64}$"}, "build": lambda p: ps(f"Restart-Service -Name '{p['name']}' -Force -ErrorAction Stop; (Get-Service '{p['name']}').Status.ToString()")},
     "service.stop": {"title": "Stop a Windows service", "risk": "modify", "params": {"name": r"^[A-Za-z0-9_.-]{1,64}$"}, "build": lambda p: ps(f"Stop-Service -Name '{p['name']}' -Force -ErrorAction Stop; (Get-Service '{p['name']}').Status.ToString()")},
-    "system.reboot": {"title": "Reboot the computer (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: {"shell": "cmd", "body": "shutdown /r /t 60 /c \"Restart requested by your IT provider\""}},
-    "system.shutdown": {"title": "Shut the computer down (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: {"shell": "cmd", "body": "shutdown /s /t 60 /c \"Shutdown requested by your IT provider\""}},
+    "system.reboot": {"title": "Reboot the computer (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: ps("& shutdown.exe /r /t 60 /c 'Restart requested by your IT provider'; 'restart scheduled in 60 seconds (abort with: shutdown /a)'")},
+    "system.shutdown": {"title": "Shut the computer down (60 s warning)", "risk": "disruptive", "params": {}, "build": lambda p: ps("& shutdown.exe /s /t 60 /c 'Shutdown requested by your IT provider'; 'shutdown scheduled in 60 seconds (abort with: shutdown /a)'")},
 }
 INVENTORY_KINDS = ("inventory.system", "inventory.apps", "services.list", "processes.top", "eventlog.recent", "windows.update.status", "disk.usage", "network.diag", "backup.status", "power.diag")
+from .diagtemplates import EXTRA as _EXTRA, EXTRA_INVENTORY as _EXTRA_INV  # noqa: E402 - agent diagnostics and typed repairs
+TEMPLATES.update(_EXTRA)
+INVENTORY_KINDS = INVENTORY_KINDS + _EXTRA_INV
 
 
 def render_template(tid: str, params: dict | None) -> dict:
@@ -90,7 +93,7 @@ def render_template(tid: str, params: dict | None) -> dict:
     for k, rx in t["params"].items():
         if k in params and not re.fullmatch(rx, str(params[k])):
             raise CoreError(f"invalid value for {k}", 422)
-        if k not in params and tid.startswith("service."):
+        if k not in params and tid.startswith(("service.", "process.")):
             raise CoreError(f"parameter {k} is required", 422)
     return {**t["build"]({k: str(v) for k, v in params.items()}), "risk": t["risk"], "title": t["title"]}
 

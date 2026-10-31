@@ -300,6 +300,13 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     from .chat import Chat
     app.state.chat = Chat(core.db, app.state.ai.ollama, workers.call)
     app.include_router(build_chat_router(core, app.state.chat, core.billing, app.state.ai))
+    from .agent import Agent
+    from .api12 import build_router as build_agent_router
+    from .knowledge import Knowledge
+    app.state.kb = Knowledge(core.db)
+    app.state.agent = Agent(core.db, ops, workers, app.state.android, app.state.chat, app.state.ai.ollama, core.billing, app.state.kb)
+    core.stop_hooks.append(app.state.agent.emergency_stop)   # the kill switch also stops every AI technician session and cancels its pending actions
+    app.include_router(build_agent_router(core, app.state.agent, app.state.kb, ops))
     ui = Path(os.environ.get("CIT_UI_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
     if (ui / "index.html").exists():  # the built dashboard is served from the same origin at /ui/ (no second web server)
         from fastapi.staticfiles import StaticFiles

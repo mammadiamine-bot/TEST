@@ -20,7 +20,7 @@ reg({
   "ai.dSubmit": { en: "Submit for approval", ar: "إرسال للموافقة" }, "ai.dSubmitted": { en: "Submitted — approve it in “Jobs & Automation”.", ar: "تم الإرسال — وافق عليه من «المهام والأتمتة»." },
   "ai.dHist": { en: "Diagnosis history", ar: "سجل التشخيص" }, "ai.eng.deterministic": { en: "built-in checks", ar: "فحوصات مدمجة" }, "ai.eng.local-model": { en: "local model", ar: "نموذج محلي" }, "ai.tokensN": { en: "{n} tokens", ar: "{n} رمز" },
   "ai.dTaskHint": { en: "You can also ask for a task, for example “find report.docx and put it on the Desktop”. The assistant drafts a script for you to review; it runs only after another person approves it.", ar: "يمكنك أيضاً طلب مهمة، مثل «ابحث عن report.docx وضعه على سطح المكتب». يصيغ المساعد سكربتاً لتراجعه، ولا يعمل إلا بعد موافقة شخص آخر." }, "ai.dDraft": { en: "Drafted script", ar: "السكربت المقترح" }, "ai.dWhen": { en: "When", ar: "الوقت" }, "ai.dReq": { en: "Request", ar: "الطلب" }, "ai.dBy": { en: "By", ar: "بواسطة" }, "ai.dTokens": { en: "Tokens", ar: "الرموز" },
-  "ws.ai": { en: "AI Assistant", ar: "المساعد الذكي" },
+  "ws.ai": { en: "AI Assistant", ar: "المساعد الذكي" }, "ai.tabDraft": { en: "Draft a task script", ar: "صياغة سكربت لمهمة" },
 });
 
 // ---- tiny Markdown renderer (headings, lists, bold/italic, inline code, links, fenced code with copy + light highlighting). No HTML is ever injected.
@@ -53,6 +53,9 @@ export function Markdown({ text }: { text: string }) {
   }
   return <div dir="auto">{blocks}</div>;
 }
+
+/** Extra tabs of the AI page (the technician workspace, knowledge, models, autonomy) register themselves here from agent.tsx. */
+export const aiTabs: { key: string; order: number; label: string; render: (p: { oid: string; presetWorker?: string }) => ReactNode }[] = [];
 
 type Host = { host: string; name: string; models: string[]; online: boolean; error?: string };
 type Msg = { role: string; content: string; ms?: number; tokens_in?: number; tokens_out?: number; stopped?: boolean };
@@ -110,8 +113,11 @@ function DiagnoseTab({ oid, presetWorker }: { oid: string; presetWorker?: string
 }
 
 function AiPage({ presetWorker, oid: given }: { presetWorker?: string; oid?: string }) {
-  useLang(); const cur = useOrgId(); const oid = given ?? cur; const [tab, setTab] = useState("chat"); void getLang; void isSenior;
-  return <>{!given && <OrgBar />}{!oid ? <NoOrg /> : <><Tabs tabs={[["chat", t("ai.tabChat")], ["diag", t("ai.tabDiag")]]} value={tab} onChange={setTab} />{tab === "chat" ? <ChatTab oid={oid} presetWorker={presetWorker} /> : <DiagnoseTab oid={oid} presetWorker={presetWorker} />}</>}</>;
+  useLang(); const cur = useOrgId(); const oid = given ?? cur; const [tab, setTab] = useState(aiTabs.length ? "tech" : "chat"); void getLang; void isSenior;
+  const all = [...aiTabs, { key: "chat", order: 10, label: "ai.tabChat", render: (p: { oid: string; presetWorker?: string }) => <ChatTab oid={p.oid} presetWorker={p.presetWorker} /> },
+    { key: "draft", order: 15, label: "ai.tabDraft", render: (p: { oid: string; presetWorker?: string }) => <DiagnoseTab oid={p.oid} presetWorker={p.presetWorker} /> }].sort((a, b) => a.order - b.order);
+  const cur2 = all.find(x => x.key === tab) ?? all[0];
+  return <>{!given && <OrgBar />}{!oid ? <NoOrg /> : <><Tabs tabs={all.map(x => [x.key, t(x.label)] as [string, string])} value={cur2.key} onChange={setTab} />{cur2.render({ oid, presetWorker })}</>}</>;
 }
 registerSection({ key: "ai", icon: "ai", order: 50, label: "nav.ai", render: () => <AiPage /> });
 registerWorkspaceTab({ key: "ai", label: "AI Assistant", node: ({ wid, oid }) => <AiPage oid={oid} presetWorker={wid} /> });
