@@ -42,7 +42,7 @@ TEMPLATES: dict[str, dict] = {
     "inventory.apps": {"title": "Installed applications", "risk": "read", "params": {}, "build": lambda p: ps(_json_ps(
         "Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | "
         "Where-Object DisplayName | Select-Object DisplayName,DisplayVersion,Publisher | Sort-Object DisplayName"))},
-    "services.list": {"title": "Windows services", "risk": "read", "params": {}, "build": lambda p: ps(_json_ps("Get-Service | Select-Object Name,DisplayName,Status,StartType"))},
+    "services.list": {"title": "Windows services", "risk": "read", "params": {}, "build": lambda p: ps(_json_ps("Get-Service | Select-Object Name,DisplayName,@{n='Status';e={$_.Status.ToString()}},@{n='StartType';e={$_.StartType.ToString()}}"))},
     "processes.top": {"title": "Top processes by memory", "risk": "read", "params": {}, "build": lambda p: ps(_json_ps(
         "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 25 Id,ProcessName,@{n='mem_mb';e={[math]::Round($_.WorkingSet64/1MB,1)}},CPU"))},
     "eventlog.recent": {"title": "Recent errors/warnings from an event log", "risk": "read", "params": {"log": r"^(System|Application|Setup)$", "hours": r"^\d{1,3}$"}, "build": lambda p: ps(_json_ps(
