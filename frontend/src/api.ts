@@ -37,3 +37,10 @@ export async function downloadReport(did: string, planId?: string) {
   const url = URL.createObjectURL(await r.blob());
   const a = document.createElement("a"); a.href = url; a.download = "report.pdf"; a.click(); URL.revokeObjectURL(url);
 }
+
+/** Fetch a binary response (e.g. a screenshot) with the same authentication as api(). */
+export async function apiBlob(path: string): Promise<Blob> {
+  const r = await fetch(base + path, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail ?? d; } catch {} throw new ApiError(r.status, typeof d === "string" ? d : JSON.stringify(d)); }
+  return r.blob();
+}
