@@ -41,6 +41,15 @@ const subs = new Set<() => void>();
 function apply() { if (typeof document === "undefined") return; document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"; }
 export function setLang(l: Lang) { lang = l; try { localStorage.setItem("lang", l); } catch {} apply(); subs.forEach(f => f()); }
 apply();
-export const t = (k: string) => D[k]?.[lang] ?? k;
+/** Register translations next to the view that uses them (every key needs en AND ar; a test enforces it). */
+export const reg = (d: Record<string, { en: string; ar: string }>) => { Object.assign(D, d); };
+/** t("key") or t("key", { n: 3 }) with {n} placeholders. Technical values are passed in as params so they keep their own direction. */
+export const t = (k: string, p?: Record<string, string | number>) => {
+  let s = D[k]?.[lang] ?? k;
+  if (p) for (const [a, b] of Object.entries(p)) s = s.split(`{${a}}`).join(String(b));
+  return s;
+};
+export const getLang = () => lang;
+export const has = (k: string) => !!D[k];
 export function useLang() { return useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f); }, () => lang); }
 export const _dict = D;
