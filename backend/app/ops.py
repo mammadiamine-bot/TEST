@@ -176,13 +176,20 @@ class Ops:
         if creator == approver:
             return True
         seen, frontier = {creator}, {creator}
-        for _ in range(8):  # transitive: A controls P and P controls V  =>  A controls V. Rows are append-only, so history cannot be rewritten.
-            nxt = {r["controller_id"] for pid in frontier for r in self.db.all("SELECT controller_id FROM principal_controllers WHERE principal_id=?", (pid,))} - seen
+        while frontier:  # transitive and unbounded (the seen-set guarantees termination): A controls P and P controls V => A controls V
+            nxt: set[str] = set()
+            for pid in frontier:
+                ids = {r["controller_id"] for r in self.db.all("SELECT controller_id FROM principal_controllers WHERE principal_id=?", (pid,))}
+                legacy = self.db.one("SELECT created_by, rotated_by FROM principals WHERE id=?", (pid,))
+                if legacy:
+                    ids |= {x for x in (legacy["created_by"], legacy["rotated_by"]) if x}
+                    if not ids:
+                        return True  # a principal whose provenance is unknown: fail closed, only the owner may approve its work
+                nxt |= ids
+            nxt -= seen
             if approver in nxt:
                 return True
             seen |= nxt; frontier = nxt
-            if not frontier:
-                break
         return False
 
     def approve(self, org: str, jid: str, approver: str, is_owner: bool, confirm: str | None) -> dict:

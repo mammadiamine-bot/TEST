@@ -108,6 +108,9 @@ class Db:
             for table, col, typ in MIGRATIONS:
                 if col not in {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}:
                     self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+            for col, reason in (("created_by", "created"), ("rotated_by", "rotated")):  # backfill the append-only control history from the older single columns
+                self.conn.execute(f"INSERT INTO principal_controllers(principal_id,controller_id,reason,at) SELECT p.id, p.{col}, '{reason}', COALESCE(p.created_at,0) FROM principals p "
+                                  f"WHERE p.{col} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM principal_controllers c WHERE c.principal_id=p.id AND c.controller_id=p.{col} AND c.reason='{reason}')")
             self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self.conn.commit()
 

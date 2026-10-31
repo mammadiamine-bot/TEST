@@ -237,3 +237,21 @@ def test_control_history_is_append_only_and_transitive(w):
     w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES('usr_b','usr_a','created',1)")
     w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES('usr_c','usr_b','created',1)")
     assert w.ops._controls("usr_c", "usr_a") is True and w.ops._controls("usr_c", "usr_z") is False
+
+
+def test_principals_with_unknown_provenance_fail_closed_and_history_is_backfilled(w, tmp_path):
+    adm_info, adm = w.mint("administrator", [w.a])
+    w.db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at) VALUES('usr_legacy','old','technician',?,?,1.0)", (json.dumps([w.a]), "h" * 64))
+    w.db.execute("INSERT INTO jobs(id,org_id,title,shell,body,risk,status,approval,created_by,created_at) VALUES('job_legacy',?,'t','cmd','echo','modify','pending_approval','pending','usr_legacy',1.0)", (w.a,))
+    w.db.execute("INSERT INTO job_runs(id,job_id,worker_id,status) VALUES('run_l','job_legacy',?, 'pending')", (w.wk["a"],))
+    assert adm.post(f"/orgs/{w.a}/jobs/job_legacy/approve", json={}).status_code == 403          # unknown provenance: only the owner
+    assert w.owner.post(f"/orgs/{w.a}/jobs/job_legacy/approve", json={}).status_code == 200
+    # backfill from the older single columns on migration
+    from app.db import Db
+    w.db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at,created_by,rotated_by) VALUES('usr_v5','n','technician','[]',?,1.0,'usr_x','usr_y')", ("k" * 64,))
+    Db(w.app.state.settings.data_dir / "c.sqlite3") if False else None
+    w.db.conn.executescript("DELETE FROM principal_controllers WHERE principal_id='usr_v5'")
+    w.db.conn.commit()
+    d2 = Db(tmp_path / "c.sqlite3")  # same database file as the fixture: re-running init performs the backfill
+    got = {(r["controller_id"], r["reason"]) for r in d2.all("SELECT * FROM principal_controllers WHERE principal_id='usr_v5'")}
+    assert got == {("usr_x", "created"), ("usr_y", "rotated")}
