@@ -106,7 +106,7 @@ class Chat:
         return f"\n<device-data>\n{clean(r['data'], 3000)}\n</device-data>" if r else ""
 
     # ---- streaming generation
-    def send(self, org: str, user: str, cid: str, content: str, model: str | None = None) -> Iterator[dict]:
+    def send(self, org: str, user: str, cid: str, content: str, model: str | None = None, lang: str = "en") -> Iterator[dict]:
         c = self.conv(org, user, cid)
         content = clean(content, 6000).strip()
         if not content:
@@ -118,7 +118,7 @@ class Chat:
         if c["title"] == "New chat":
             self.db.execute("UPDATE chat_conversations SET title=? WHERE id=?", (content[:60], cid))
         body = {"model": c["model"], "stream": True, "options": {"temperature": 0.3, "num_ctx": 4096},
-                "messages": [{"role": "system", "content": SYSTEM + self.context(c["worker_id"])}, *history, {"role": "user", "content": content}]}
+                "messages": [{"role": "system", "content": SYSTEM + (" The interface language is Arabic: answer in Arabic unless the user writes in English." if lang == "ar" else "") + self.context(c["worker_id"])}, *history, {"role": "user", "content": content}]}
         return self._run(org, c, body)
 
     def _run(self, org: str, c: dict, body: dict) -> Iterator[dict]:

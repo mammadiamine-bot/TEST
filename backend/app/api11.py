@@ -22,6 +22,7 @@ class NewConv(BaseModel):
 class Msg(BaseModel):
     content: str = Field(min_length=1, max_length=6000)
     model: str | None = Field(default=None, max_length=80)
+    lang: str = Field(default="en", max_length=2)
 
 
 def build_router(core, chat: Chat, billing, aitech) -> APIRouter:
@@ -63,7 +64,7 @@ def build_router(core, chat: Chat, billing, aitech) -> APIRouter:
         gate(oid)
         chat.on_tokens = lambda org, n: n and billing.add_ai_tokens(org, n)
         try:
-            gen = chat.send(oid, request.state.principal.id, cid, b.content, b.model)
+            gen = chat.send(oid, request.state.principal.id, cid, b.content, b.model, b.lang)
         except CoreError as e:
             raise HTTPException(e.status, str(e))
         db.audit(request.state.principal.id, "chat.message", None, org=oid, conversation=cid, chars=len(b.content))   # never the text itself

@@ -11,6 +11,7 @@ from .security import require_token
 class AskIn(BaseModel):
     worker_id: str
     request: str = Field(min_length=3, max_length=1000)
+    lang: str = Field(default="en", max_length=2)
 
 
 class SettingsIn(BaseModel):
@@ -34,7 +35,7 @@ def build_router(core, ai: AiTech) -> APIRouter:
     @r.post("/orgs/{oid}/ai/ask", status_code=201)
     def ask(oid: str, b: AskIn, request: Request):
         need_org(oid)
-        return ai.ask(oid, b.worker_id, request.state.principal.id, b.request)
+        return ai.ask(oid, b.worker_id, request.state.principal.id, b.request, b.lang)
 
     @r.get("/orgs/{oid}/ai/runs")
     def runs(oid: str):

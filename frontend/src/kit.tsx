@@ -71,7 +71,7 @@ export const Err = ({ m }: { m: string }) => (m ? <div className="err" role="ale
 export const stl = (v: string) => (has("st." + v) ? t("st." + v) : v);
 const GOOD = ["online", "ok", "completed", "active", "resolved", "approved", "enrolled"], BAD = ["failed", "offline", "unreachable", "critical", "expired", "cancelled", "timed_out", "blocked"], WARN = ["degraded", "reconnecting", "pending_approval", "partial", "needs_pairing"];
 export const Pill = ({ v }: { v: string }) => <span className={"pill " + (GOOD.includes(v) ? "ok" : BAD.includes(v) ? "bad" : WARN.includes(v) ? "warn" : "")}>{stl(v)}</span>;
-export const when = (ts: number | null | undefined) => (ts ? new Date(ts * 1000).toLocaleString(undefined) : "—");
+export const when = (ts: number | null | undefined) => (ts ? "\u2066" + new Date(ts * 1000).toLocaleString(undefined) + "\u2069" : "—");   // LRI..PDI keeps the date readable inside RTL text
 export const Help = ({ text }: { text: string }) => <span className="help" title={text} aria-label={text} role="img">?</span>;
 export const Empty = ({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) => <div className="empty"><b>{title}</b>{hint && <span className="tag">{hint}</span>}{children}</div>;
 
