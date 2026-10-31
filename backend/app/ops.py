@@ -171,11 +171,18 @@ class Ops:
             self._start(jid)
         return self.job(jid)
 
+    def _controls(self, creator: str, approver: str) -> bool:
+        """True when the approver is the creator OR minted/invited/last rotated the creator's token: they could act as the creator, so that is not a second person."""
+        if creator == approver:
+            return True
+        p = self.db.one("SELECT created_by, rotated_by FROM principals WHERE id=?", (creator,))
+        return bool(p) and approver in (p["created_by"], p["rotated_by"])
+
     def approve(self, org: str, jid: str, approver: str, is_owner: bool, confirm: str | None) -> dict:
         j = self._job_of(org, jid)
         if j["status"] != "pending_approval":
             raise CoreError("this job is not waiting for approval", 409)
-        if j["created_by"] == approver and not is_owner:
+        if not is_owner and self._controls(j["created_by"], approver):
             raise CoreError("a second person must approve (four-eyes rule)", 403)
         if j["risk"] == "disruptive" and confirm != "I APPROVE":
             raise CoreError('disruptive jobs need the confirmation text "I APPROVE"', 422)
@@ -324,7 +331,7 @@ class Ops:
         s = self.db.one("SELECT * FROM schedules WHERE id=? AND org_id=?", (sid, org))
         if not s:
             raise CoreError("unknown schedule", 404)
-        if s["created_by"] == approver and not is_owner:
+        if not is_owner and self._controls(s["created_by"], approver):
             raise CoreError("a second person must approve (four-eyes rule)", 403)
         self.db.execute("UPDATE schedules SET approved_by=?, enabled=1 WHERE id=?", (approver, sid))
         self.db.audit(approver, "schedule.approved", None, org=org, schedule=sid, risk=s["risk"])

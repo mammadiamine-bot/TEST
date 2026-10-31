@@ -65,3 +65,13 @@ def test_structured_log_line_is_json_without_secrets():
     r = logging.LogRecord("x", logging.WARNING, __file__, 1, "worker %s offline", ("wst_1",), None)
     d = json.loads(JsonFormatter().format(r))
     assert d["level"] == "WARNING" and d["msg"] == "worker wst_1 offline" and d["ts"].endswith("Z")
+
+
+def test_rmm_tables_from_an_earlier_build_gain_later_columns(tmp_path):
+    p = tmp_path / "mid.sqlite3"
+    c = sqlite3.connect(p)   # a controller database created before schedules.approved_by / job_runs.remote existed
+    c.executescript("CREATE TABLE schedules(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, shell TEXT NOT NULL, body TEXT NOT NULL, risk TEXT NOT NULL, targets TEXT NOT NULL, every_minutes INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, next_run REAL NOT NULL, last_run REAL, created_by TEXT NOT NULL, created_at REAL NOT NULL);"
+                    "CREATE TABLE job_runs(id TEXT PRIMARY KEY, job_id TEXT NOT NULL, worker_id TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, exit_code INTEGER, output TEXT DEFAULT '', started_at REAL, finished_at REAL, error TEXT);")
+    c.commit(); c.close()
+    db = Db(p)
+    assert db.one("SELECT approved_by FROM schedules") is None and db.all("SELECT remote FROM job_runs") == []

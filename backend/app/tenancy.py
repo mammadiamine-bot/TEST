@@ -150,7 +150,7 @@ def mint_principal(db, name: str, role: str, org_ids: list[str], actor: str) -> 
         raise HTTPException(422, "at least one existing organization is required; unrestricted principals cannot be created")
     tok = "cit_" + secrets.token_urlsafe(32)
     pid = new_id("usr")
-    db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at) VALUES(?,?,?,?,?,?)",
-               (pid, name[:80], role, json.dumps(sorted(set(org_ids))), token_hash(tok), time.time()))
+    db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at,created_by) VALUES(?,?,?,?,?,?,?)",
+               (pid, name[:80], role, json.dumps(sorted(set(org_ids))), token_hash(tok), time.time(), actor))
     db.audit(actor, "principal.created", None, principal=pid, role=role, orgs=sorted(set(org_ids)))
     return {"id": pid, "name": name, "role": role, "org_ids": sorted(set(org_ids))}, tok

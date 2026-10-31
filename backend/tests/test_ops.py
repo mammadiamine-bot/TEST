@@ -199,3 +199,23 @@ def test_inventory_collection_parses_and_stores_latest(w):
     assert tb.post(f"/workers/{w.wk['a']}/inventory/inventory.system").status_code == 403
     assert all("citcheck" not in c[2] for c in w.fake.calls)
     assert w.fake.calls[0][2] == "/clients" and w.fake.calls[1][2].startswith("/clients/org_")   # per-client workspace on the machine
+
+
+def test_an_administrator_cannot_launder_approval_through_a_principal_they_created_or_rotated(w):
+    adm_info, adm = w.mint("administrator", [w.a])
+    adm2_info, adm2 = w.mint("administrator", [w.a])
+    made = adm.post("/principals", json={"name": "puppet", "role": "technician", "org_ids": [w.a]}).json()
+    puppet = TestClient(w.app, headers={"Authorization": "Bearer " + made["token"]})
+    j = puppet.post(f"/orgs/{w.a}/jobs", json={"shell": "cmd", "body": "echo x", "targets": [w.wk["a"]]}).json()
+    assert adm.post(f"/orgs/{w.a}/jobs/{j['id']}/approve", json={}).status_code == 403      # minted the creator: not a second person
+    assert adm2.post(f"/orgs/{w.a}/jobs/{j['id']}/approve", json={}).status_code == 200     # a genuinely different administrator may
+    other, _ = w.mint("technician", [w.a])
+    rot = adm.post(f"/principals/{other['id']}/rotate").json()["token"]                       # rotating gives the rotator the token
+    rotated = TestClient(w.app, headers={"Authorization": "Bearer " + rot})
+    j2 = rotated.post(f"/orgs/{w.a}/jobs", json={"shell": "cmd", "body": "echo y", "targets": [w.wk["a"]]}).json()
+    assert adm.post(f"/orgs/{w.a}/jobs/{j2['id']}/approve", json={}).status_code == 403
+    inv = adm.post(f"/orgs/{w.a}/invitations", json={"role": "technician"}).json()["token"]
+    red = TestClient(w.app).post("/invitations/accept", json={"token": inv, "name": "Invited"}).json()
+    j3 = TestClient(w.app, headers={"Authorization": "Bearer " + red["token"]}).post(f"/orgs/{w.a}/jobs", json={"shell": "cmd", "body": "echo z", "targets": [w.wk["a"]]}).json()
+    assert adm.post(f"/orgs/{w.a}/jobs/{j3['id']}/approve", json={}).status_code == 403      # the inviter counts too
+    assert w.owner.post(f"/orgs/{w.a}/jobs/{j3['id']}/approve", json={}).status_code == 200

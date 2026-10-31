@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS inventory(worker_id TEXT NOT NULL, kind TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 
-SCHEMA_VERSION = 3  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables
-MIGRATIONS = [("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
+SCHEMA_VERSION = 5  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
+MIGRATIONS = [("principals", "created_by", "TEXT"), ("principals", "rotated_by", "TEXT"), ("schedules", "approved_by", "TEXT"), ("job_runs", "remote", "TEXT"), ("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 
 def new_id(prefix: str) -> str:
