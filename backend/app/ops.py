@@ -192,11 +192,15 @@ class Ops:
             seen |= nxt; frontier = nxt
         return False
 
+    def _same_person(self, a: str, b: str) -> bool:
+        """Symmetric: reject when either principal could act as the other (a controls b, or b controls a)."""
+        return self._controls(a, b) or self._controls(b, a)
+
     def approve(self, org: str, jid: str, approver: str, is_owner: bool, confirm: str | None) -> dict:
         j = self._job_of(org, jid)
         if j["status"] != "pending_approval":
             raise CoreError("this job is not waiting for approval", 409)
-        if not is_owner and self._controls(j["created_by"], approver):
+        if not is_owner and self._same_person(j["created_by"], approver):
             raise CoreError("a second person must approve (four-eyes rule)", 403)
         if j["risk"] == "disruptive" and confirm != "I APPROVE":
             raise CoreError('disruptive jobs need the confirmation text "I APPROVE"', 422)
@@ -345,7 +349,7 @@ class Ops:
         s = self.db.one("SELECT * FROM schedules WHERE id=? AND org_id=?", (sid, org))
         if not s:
             raise CoreError("unknown schedule", 404)
-        if not is_owner and self._controls(s["created_by"], approver):
+        if not is_owner and self._same_person(s["created_by"], approver):
             raise CoreError("a second person must approve (four-eyes rule)", 403)
         self.db.execute("UPDATE schedules SET approved_by=?, enabled=1 WHERE id=?", (approver, sid))
         self.db.audit(approver, "schedule.approved", None, org=org, schedule=sid, risk=s["risk"])

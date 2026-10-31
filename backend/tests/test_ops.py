@@ -255,3 +255,14 @@ def test_principals_with_unknown_provenance_fail_closed_and_history_is_backfille
     d2 = Db(tmp_path / "c.sqlite3")  # same database file as the fixture: re-running init performs the backfill
     got = {(r["controller_id"], r["reason"]) for r in d2.all("SELECT * FROM principal_controllers WHERE principal_id='usr_v5'")}
     assert got == {("usr_x", "created"), ("usr_y", "rotated")}
+
+
+def test_four_eyes_check_is_symmetric(w):
+    # an approver who was themselves created by the job's creator is not an independent second person either
+    adm_info, adm = w.mint("administrator", [w.a])
+    w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES(?,?,?,1)", (adm_info["id"], "usr_creator", "created"))
+    w.db.execute("INSERT INTO principals(id,name,role,org_ids,token_hash,created_at,created_by) VALUES('usr_creator','c','technician',?,?,1.0,'owner')", (json.dumps([w.a]), "z" * 64))
+    w.db.execute("INSERT INTO principal_controllers(principal_id,controller_id,reason,at) VALUES('usr_creator','owner','created',1)")
+    w.db.execute("INSERT INTO jobs(id,org_id,title,shell,body,risk,status,approval,created_by,created_at) VALUES('job_sym',?,'t','cmd','echo','modify','pending_approval','pending','usr_creator',1.0)", (w.a,))
+    w.db.execute("INSERT INTO job_runs(id,job_id,worker_id,status) VALUES('run_s','job_sym',?,'pending')", (w.wk["a"],))
+    assert adm.post(f"/orgs/{w.a}/jobs/job_sym/approve", json={}).status_code == 403
