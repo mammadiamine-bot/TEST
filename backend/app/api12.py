@@ -127,8 +127,12 @@ def build_router(core, agent: Agent, kb: Knowledge, ops) -> APIRouter:
         return agent.models(oid)
 
     @r.post("/orgs/{oid}/agent/models/benchmark")
-    def bench(oid: str, b: BenchIn):
+    def bench(oid: str, b: BenchIn, request: Request):
         need_org(oid)
+        if b.host != "main" and not db.one("SELECT 1 AS x FROM workers WHERE id=? AND org_id=?", (b.host, oid)):
+            raise HTTPException(422, "that AI host does not belong to this client")
+        if P(request).role == "viewer":
+            raise HTTPException(403, "your role cannot run benchmarks")
         return agent.benchmark(oid, b.host, b.model)
 
     @r.post("/orgs/{oid}/agent/sessions", status_code=201)

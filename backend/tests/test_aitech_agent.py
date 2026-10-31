@@ -555,3 +555,10 @@ def test_proactive_monitoring_is_off_by_default_owner_only_and_opens_a_normal_se
     assert j["actor"] == "monitor" and j["report"]["causes"][0]["code"] == "mem_pressure" and j["actions"] == []        # level 1: it only diagnoses
     assert w.agent.monitor_tick() == 0                                                   # cooldown: no repeated incident for the same computer
     w.box.s.update(free=7000)
+
+
+def test_benchmark_refuses_another_clients_computer_and_viewers(w):
+    w.use_ollama()
+    other = w.mint("administrator", [w.b])
+    assert other.post(f"/orgs/{w.b}/agent/models/benchmark", json={"host": w.wid, "model": "qwen2.5:1.5b"}).status_code == 422
+    assert w.mint("viewer", [w.a]).post(f"/orgs/{w.a}/agent/models/benchmark", json={"host": "main", "model": "qwen2.5:1.5b"}).status_code in (403,)
