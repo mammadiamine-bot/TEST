@@ -176,3 +176,14 @@ def test_model_suggested_commands_are_stripped_from_prose():
     from app.aitech import strip_commands
     out = strip_commands("The service 'Spooler' is stopped. To fix it, run the command 'net start spooler'. Check the cable.")
     assert "net start" not in out and "Spooler" in out and "cable" in out
+
+
+def test_a_service_name_the_validator_rejects_does_not_fail_the_diagnosis(w):
+    DATA["Get-Service"].append({"Name": "MSSQL$SQLEXPRESS", "DisplayName": "SQL Server", "Status": 1, "StartType": 2})
+    try:
+        r = ask(w, "check the services please")
+    finally:
+        DATA["Get-Service"].pop()
+    assert r.status_code == 201
+    names = [p["params"]["name"] for p in r.json()["plan"]["proposals"]]
+    assert names == ["Spooler"]   # the odd name has a finding but no proposal

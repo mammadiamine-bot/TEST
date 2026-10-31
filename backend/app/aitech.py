@@ -176,8 +176,15 @@ class AiTech:
         answer = self._summary(findings, evidence, model, notes)
         if answer[1]:
             t_in, t_out, engine, model = t_in + answer[1], t_out + answer[2], "local-model", model
-        proposals = [{"n": i, "finding": f["title"], **f["proposal"], "preview": render_template(f["proposal"]["template"], f["proposal"]["params"]) | {"note": "NOT executed - needs approval"}}
-                     for i, f in enumerate(findings) if f.get("proposal")]
+        proposals = []
+        for i, f in enumerate(findings):
+            if not f.get("proposal"):
+                continue
+            try:  # a service whose name the template validator rejects simply gets no proposal; it must not fail the whole diagnosis
+                prev = render_template(f["proposal"]["template"], f["proposal"]["params"])
+            except CoreError:
+                continue
+            proposals.append({"n": i, "finding": f["title"], **f["proposal"], "preview": prev | {"note": "NOT executed - needs approval"}})
         run = {"id": rid, "org_id": org, "worker_id": wid, "actor": actor, "request": request, "engine": engine, "model": model if engine == "local-model" else None,
                "plan": json.dumps({"tools": tools, "findings": findings, "proposals": proposals, "notes": notes}), "answer": answer[0], "tokens_in": t_in, "tokens_out": t_out, "status": "completed", "ts": time.time()}
         self.db.execute("INSERT INTO ai_runs(id,org_id,worker_id,actor,request,engine,model,plan,answer,tokens_in,tokens_out,status,ts) VALUES(:id,:org_id,:worker_id,:actor,:request,:engine,:model,:plan,:answer,:tokens_in,:tokens_out,:status,:ts)", run)

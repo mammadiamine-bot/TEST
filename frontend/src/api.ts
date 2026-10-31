@@ -1,5 +1,7 @@
 export type Json = any;
 let base = (import.meta as any).env?.VITE_API_URL ?? "http://127.0.0.1:8765";
+// one-click launcher: a sign-in token in the URL fragment (#token=...) is taken once, kept for this tab, and removed from the address bar
+try { const m = /[#&]token=([^&]+)/.exec(location.hash); if (m) { sessionStorage.setItem("cit_token", decodeURIComponent(m[1])); history.replaceState(null, "", location.pathname + location.search); } } catch {}
 const stored = (): string => { try { return sessionStorage.getItem("cit_token") ?? ""; } catch { return ""; } };
 let token: string = (import.meta as any).env?.VITE_API_TOKEN ?? stored();  // dev/Tauri inject one; the web build asks the person to sign in (per tab, never persisted)
 export const hasToken = () => !!token;

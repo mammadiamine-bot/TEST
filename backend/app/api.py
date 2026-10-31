@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -286,4 +287,8 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     from .api8 import build_router as build_ai_router
     app.state.ai = AiTech(core.db, ops, core.billing)
     app.include_router(build_ai_router(core, app.state.ai))
+    ui = Path(os.environ.get("CIT_UI_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
+    if (ui / "index.html").exists():  # the built dashboard is served from the same origin at /ui/ (no second web server)
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/ui", StaticFiles(directory=str(ui), html=True), name="ui")
     return app
