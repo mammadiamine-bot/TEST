@@ -99,7 +99,7 @@ export const registerWorkspaceTab = (tab: WsTab) => { if (!EXTRA.find(x => x.key
 
 function Workspace({ wid, oid, onBack, row }: { wid: string; oid: string; onBack: () => void; row?: DevRow }) {
   useLang(); const [tab, setTab] = useState("overview");
-  const base: [string, string][] = [["overview", t("ws.overview")], ...EXTRA.map(x => [x.key, x.label] as [string, string]), ["terminal", t("ws.terminal")], ["files", t("ws.files")], ["diag", t("ws.diag")], ["monitor", t("ws.monitor")], ["jobs", t("ws.jobs")], ["history", t("ws.history")]];
+  const base: [string, string][] = [["overview", t("ws.overview")], ...EXTRA.map(x => [x.key, t("ws." + x.key)] as [string, string]), ["terminal", t("ws.terminal")], ["files", t("ws.files")], ["diag", t("ws.diag")], ["monitor", t("ws.monitor")], ["jobs", t("ws.jobs")], ["history", t("ws.history")]];
   const ex = EXTRA.find(x => x.key === tab);
   return <div className="fade"><div className="row" style={{ marginBottom: 10 }}><button className="btn ghost sm" onClick={onBack}><span className="flip">‹</span> {t("ws.back")}</button><h3 style={{ margin: 0, fontSize: 17, textTransform: "none", color: "var(--tx)" }}>{row?.name ?? wid}</h3>{row && <Pill v={row.state} />}<span className="tag ltr">{wid}</span></div>
     <Tabs tabs={base} value={tab} onChange={setTab} />

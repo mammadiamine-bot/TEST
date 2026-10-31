@@ -287,6 +287,11 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     from .api8 import build_router as build_ai_router
     app.state.ai = AiTech(core.db, ops, core.billing)
     app.include_router(build_ai_router(core, app.state.ai))
+    from .api9 import build_router as build_remote_router
+    from .remote import Remote
+    app.state.remote = Remote(core.db)
+    core.stop_hooks.append(app.state.remote.end_all)   # emergency stop closes every live-control session
+    app.include_router(build_remote_router(core, app.state.remote))
     ui = Path(os.environ.get("CIT_UI_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
     if (ui / "index.html").exists():  # the built dashboard is served from the same origin at /ui/ (no second web server)
         from fastapi.staticfiles import StaticFiles

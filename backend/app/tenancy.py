@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request
 
 ROLES = ("administrator", "technician", "viewer", "customer")  # "owner" exists only as the built-in token; it cannot be minted through the API (no privilege escalation)
-READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools", "/me", "/ops/templates", "/plans", "/ai/status"}  # not tenant data
+READ_OPEN = {"/status", "/features", "/stacks", "/task-kinds", "/tools", "/me", "/ops/templates", "/plans", "/ai/status", "/remote/status"}  # not tenant data
 # resource kind -> table whose device_id/org_id gives the owning organization
 DEVICE_CHILD = {"projects": "projects", "tasks": "tasks", "plans": "plans", "runs": "runs", "sessions": "sessions"}
 RESOURCE = re.compile(r"^/(devices|workers|projects|tasks|plans|runs|sessions)/([^/]+)")

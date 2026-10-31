@@ -78,10 +78,11 @@ CREATE TABLE IF NOT EXISTS usage(org_id TEXT NOT NULL, day TEXT NOT NULL, device
 CREATE TABLE IF NOT EXISTS tickets(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, alert_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal', status TEXT NOT NULL DEFAULT 'open', created_by TEXT NOT NULL, created_at REAL NOT NULL, due_at REAL, resolved_at REAL);
 CREATE TABLE IF NOT EXISTS ai_runs(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT, actor TEXT NOT NULL, request TEXT NOT NULL, engine TEXT NOT NULL, model TEXT, plan TEXT, answer TEXT, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, status TEXT NOT NULL, ts REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS inventory(worker_id TEXT NOT NULL, kind TEXT NOT NULL, ts REAL NOT NULL, data TEXT NOT NULL, PRIMARY KEY(worker_id, kind));
+CREATE TABLE IF NOT EXISTS remote_sessions(id TEXT PRIMARY KEY, org_id TEXT NOT NULL, worker_id TEXT NOT NULL, operator TEXT NOT NULL, engine TEXT NOT NULL, started_at REAL NOT NULL, expires_at REAL NOT NULL, ended_at REAL, status TEXT NOT NULL, controllable INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS org_settings(org_id TEXT PRIMARY KEY, ai_enabled INTEGER NOT NULL DEFAULT 1, ai_cloud INTEGER NOT NULL DEFAULT 0, retention_days INTEGER NOT NULL DEFAULT 30);
 """
 
-SCHEMA_VERSION = 6  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
+SCHEMA_VERSION = 7  # 1 = M1-M5, 2 = tenancy, 3 = RMM tables, 4 = columns added to RMM tables
 MIGRATIONS = [("principals", "created_by", "TEXT"), ("principals", "rotated_by", "TEXT"), ("schedules", "approved_by", "TEXT"), ("job_runs", "remote", "TEXT"), ("orgs", "status", "TEXT DEFAULT 'active'"), ("orgs", "retention_until", "REAL"), ("orgs", "offboarded_at", "REAL"), ("devices", "org_id", "TEXT"), ("devices", "site_id", "TEXT"), ("workers", "org_id", "TEXT"), ("workers", "site_id", "TEXT")]
 
 
