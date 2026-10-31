@@ -9,6 +9,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from pathlib import Path
@@ -29,13 +30,28 @@ PERIOD = 30 * 86400
 
 
 class Billing:
-    def __init__(self, db: Db, data_dir: Path):
+    def __init__(self, db: Db, data_dir: Path, protector=None):
+        """The signing key is created atomically owner-only (0600) and, where the OS offers it (Windows DPAPI), stored encrypted to the user."""
         self.db = db
+        from .protect import default_protector
+        prot = protector or default_protector()
         f = Path(data_dir) / "license.key"
         f.parent.mkdir(parents=True, exist_ok=True)
         if not f.exists():
-            f.write_text(secrets.token_hex(32));
-        self._key = bytes.fromhex(f.read_text().strip())
+            raw = secrets.token_hex(32).encode()
+            try:
+                blob = b"P1" + prot.protect(raw)
+            except Exception:  # noqa: BLE001 - no OS-backed store: fall back to a 0600 file (documented limitation)
+                blob = b"R1" + raw
+            fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(blob)
+        blob = f.read_bytes()
+        try:
+            os.chmod(f, 0o600)
+        except OSError:
+            pass
+        self._key = bytes.fromhex((prot.unprotect(blob[2:]) if blob[:2] == b"P1" else blob[2:]).decode())
 
     # ---- subscription lifecycle
     def ensure(self, org: str) -> dict:

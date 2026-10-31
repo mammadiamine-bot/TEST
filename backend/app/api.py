@@ -274,4 +274,8 @@ def create_app(settings: Settings | None = None, core: Core | None = None) -> Fa
     core.billing = Billing(core.db, settings.data_dir)
     app.include_router(build_ops_router(core, ops, core.billing.entitle))  # fails closed: no plan/feature, no job
     app.include_router(build_billing_router(core, core.billing))
+    from .aitech import AiTech
+    from .api8 import build_router as build_ai_router
+    app.state.ai = AiTech(core.db, ops, core.billing)
+    app.include_router(build_ai_router(core, app.state.ai))
     return app
